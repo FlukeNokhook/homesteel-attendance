@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1d4ed8" />
+  <title>HomesteelKK • ลา โอที & เวลาทำงาน</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div id="avatar" class="avatar">🏭</div>
+      <div class="hero-text">
+        <div id="greeting" class="greet">สวัสดีครับ</div>
+        <div id="userName" class="uname">กำลังเชื่อมต่อ LINE...</div>
+        <div id="userDept" class="udept"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="statusBox" class="card status-card">
+      <div id="statusSpinner" class="spinner"></div>
+      <p id="statusMsg">กำลังโหลดข้อมูลของคุณ...</p>
+      <div id="unregisteredBox" class="hidden">
+        <div class="uid-box">
+          <input type="text" id="myLineUid" readonly />
+          <button class="btn btn-primary btn-sm" onclick="copyLineUid()">คัดลอก</button>
+        </div>
+      </div>
+      <button id="retryBtn" class="btn btn-ghost hidden" onclick="location.reload()">ลองใหม่อีกครั้ง</button>
+    </section>
+
+    <div id="mainContent" class="hidden">
+      <!-- ===== Tab: Leave ===== -->
+      <section id="tab-leave" class="tab">
+        <div class="section-title">ยื่นใบลา</div>
+        <form id="leaveForm" class="card" onsubmit="submitLeave(event)">
+          <label class="label">ประเภทการลา</label>
+          <div class="choice-grid" style="grid-template-columns:repeat(4,1fr);">
+            <label class="choice"><input type="radio" name="leaveType" value="ลาป่วย" checked><span><i>🤒</i>ลาป่วย</span></label>
+            <label class="choice"><input type="radio" name="leaveType" value="ลากิจ"><span><i>💼</i>ลากิจ</span></label>
+            <label class="choice"><input type="radio" name="leaveType" value="ลาพักร้อน"><span><i>🌴</i>พักร้อน</span></label>
+            <label class="choice"><input type="radio" name="leaveType" value="ลาอื่นๆ"><span><i>📄</i>อื่นๆ</span></label>
+          </div>
+
+          <div id="quotaBanner" class="summary" style="background:#eff6ff; color:#1e3a8a;"></div>
+
+          <!-- ตัวเลือกเฉพาะลาป่วย -->
+          <div id="sickReasonWrap" class="field">
+            <label class="label">ลักษณะการลาป่วย</label>
+            <div class="segmented" style="margin-bottom:0;">
+              <label><input type="radio" name="sickReasonType" value="SUDDEN" checked><span>ป่วยกะทันหัน</span></label>
+              <label><input type="radio" name="sickReasonType" value="APPOINTMENT"><span>นัดแพทย์</span></label>
+            </div>
+          </div>
+
+          <label class="label">ลานานแค่ไหน</label>
+          <div class="segmented">
+            <label><input type="radio" name="durationMode" value="FULL_DAY" checked><span>เต็มวัน</span></label>
+            <label><input type="radio" name="durationMode" value="HALF_DAY"><span>ครึ่งวัน</span></label>
+            <label><input type="radio" name="durationMode" value="HOURS"><span>รายชั่วโมง</span></label>
+          </div>
+
+          <div class="row-2">
+            <div class="field">
+              <label class="label" id="leaveStartLabel" for="leaveStart">ตั้งแต่วันที่</label>
+              <input type="date" id="leaveStart" class="input" required />
+            </div>
+            <div class="field" id="leaveEndWrap">
+              <label class="label" for="leaveEnd">ถึงวันที่</label>
+              <input type="date" id="leaveEnd" class="input" required />
+            </div>
+          </div>
+
+          <div id="leaveHoursWrap" class="field hidden">
+            <label class="label">จำนวนชั่วโมง</label>
+            <div class="stepper">
+              <button type="button" onclick="stepHours(-0.5)">−</button>
+              <div><b id="leaveHoursVal">2</b> ชั่วโมง</div>
+              <button type="button" onclick="stepHours(0.5)">+</button>
+            </div>
+          </div>
+
+          <!-- เหตุกะทันหันสำหรับลากิจในวันเดียวกัน -->
+          <div id="urgentWrap" class="field hidden">
+            <label class="label" for="urgentReason">ลากิจในวันเดียวกัน (เหตุกะทันหัน)</label>
+            <input type="text" id="urgentReason" class="input" placeholder="ระบุเหตุจำเป็นเร่งด่วน เช่น รถเสีย, ธุระด่วนทางบ้าน" />
+          </div>
+
+          <div class="field">
+            <label class="label" for="leaveReason">เหตุผลการลา</label>
+            <textarea id="leaveReason" class="input" rows="2" placeholder="ระบุเหตุผลการลาสั้นๆ" required></textarea>
+          </div>
+
+          <div class="field">
+            <label class="label">แนบรูปใบรับรองแพทย์ / เอกสาร <span class="opt">(ถ้ามี)</span></label>
+            <label id="uploadBox" class="upload">
+              <input type="file" id="leaveFile" accept="image/*" />
+              <div id="uploadEmpty"><i>📷</i><div>แตะเพื่อถ่ายรูปหรือเลือกรูป</div></div>
+              <div id="uploadPreview" class="hidden"><img id="uploadImg" alt="" /><button type="button" class="remove" onclick="clearFile(event)">✕</button></div>
+            </label>
+          </div>
+
+          <div id="leaveSummary" class="summary"></div>
+          <button type="submit" id="btnSubmitLeave" class="btn btn-primary btn-block">ส่งใบลา</button>
+        </form>
+      </section>
+
+      <!-- ===== Tab: OT ===== -->
+      <section id="tab-ot" class="tab hidden">
+        <div class="section-title">ขอทำโอที</div>
+        <form id="otForm" class="card" onsubmit="submitOT(event)">
+          <div class="field">
+            <label class="label" for="otDate">วันที่ทำโอที</label>
+            <input type="date" id="otDate" class="input" required />
+          </div>
+
+          <div class="row-2">
+            <div class="field">
+              <label class="label" for="otStart">เริ่ม</label>
+              <input type="time" id="otStart" class="input" value="17:30" required />
+            </div>
+            <div class="field">
+              <label class="label" for="otEnd">ถึง</label>
+              <input type="time" id="otEnd" class="input" value="19:30" required />
+            </div>
+          </div>
+
+          <div class="quick">
+            <span class="hint">เลือกด่วน:</span>
+            <button type="button" class="chip" onclick="quickOt(1)">1 ชม.</button>
+            <button type="button" class="chip" onclick="quickOt(1.5)">1.5 ชม.</button>
+            <button type="button" class="chip" onclick="quickOt(2)">2 ชม.</button>
+            <button type="button" class="chip" onclick="quickOt(3)">3 ชม.</button>
+          </div>
+
+          <div id="otTotal" class="ot-total">รวม <b>2 ชม.</b></div>
+
+          <div class="field">
+            <label class="label" for="otJob">งานอ้างอิง</label>
+            <input type="text" id="otJob" class="input" placeholder="เช่น ส่งแผ่น อุดร, ทำ PU, ทำ PE" list="jobSuggest" required />
+            <datalist id="jobSuggest"></datalist>
+          </div>
+          <div class="field">
+            <label class="label" for="otReason">รายละเอียดเพิ่มเติม <span class="opt">(ถ้ามี)</span></label>
+            <textarea id="otReason" class="input" rows="2" placeholder="รายละเอียดงานที่ทำล่วงเวลา"></textarea>
+          </div>
+          <button type="submit" id="btnSubmitOt" class="btn btn-primary btn-block">ส่งคำขอโอที</button>
+        </form>
+      </section>
+
+      <!-- ===== Tab: Attendance & Missed Scan ===== -->
+      <section id="tab-attendance" class="tab hidden">
+        <div class="section-title">แจ้งลืมสแกนนิ้ว & เวลาเข้า-ออก</div>
+        <form id="missedForm" class="card" onsubmit="submitMissedScan(event)">
+          <div style="font-weight:700; margin-bottom:10px;">🔔 แจ้งลืมสแกนนิ้ว</div>
+          <div class="row-2">
+            <div class="field">
+              <label class="label" for="msDate">วันที่ลืมสแกน</label>
+              <input type="date" id="msDate" class="input" required />
+            </div>
+            <div class="field">
+              <label class="label" for="msTime">เวลาโดยประมาณ</label>
+              <input type="time" id="msTime" class="input" value="08:00" />
+            </div>
+          </div>
+          <label class="label">ลืมสแกนช่วงไหน</label>
+          <div class="segmented">
+            <label><input type="radio" name="msType" value="IN" checked><span>เข้างาน</span></label>
+            <label><input type="radio" name="msType" value="OUT"><span>ออกงาน</span></label>
+            <label><input type="radio" name="msType" value="BOTH"><span>ทั้งคู่</span></label>
+          </div>
+          <div class="field">
+            <label class="label" for="msReason">เหตุผล</label>
+            <input type="text" id="msReason" class="input" placeholder="เช่น รีบไปส่งของ, นิ้วลอกสแกนไม่ติด" required />
+          </div>
+          <button type="submit" id="btnSubmitMs" class="btn btn-primary btn-block">แจ้งลืมสแกนนิ้ว</button>
+        </form>
+
+        <div class="group-label">เวลาเข้า-ออกเดือนนี้</div>
+        <div id="myAttendanceList"></div>
+      </section>
+
+      <!-- ===== Tab: History ===== -->
+      <section id="tab-history" class="tab hidden">
+        <div class="section-title">ประวัติของฉัน</div>
+        <div class="segmented seg-light">
+          <label><input type="radio" name="histFilter" value="leave" checked><span>ใบลา</span></label>
+          <label><input type="radio" name="histFilter" value="ot"><span>โอที</span></label>
+        </div>
+        <div id="historyList"></div>
+        <input type="file" id="laterCertInput" accept="image/*" class="hidden" />
+      </section>
+
+      <!-- ===== Tab: Approve / Acknowledge ===== -->
+      <section id="tab-approve" class="tab hidden">
+        <div class="section-title">อนุมัติ / รับทราบ</div>
+        <div id="approveList"></div>
+      </section>
+    </div>
+  </main>
+
+  <nav id="bottomNav" class="bottom-nav hidden">
+    <button class="active" data-tab="leave"><i>📝</i><span>ขอลา</span></button>
+    <button data-tab="ot"><i>⏰</i><span>ขอโอที</span></button>
+    <button data-tab="attendance"><i>🕒</i><span>เวลา/ลืมสแกน</span></button>
+    <button data-tab="history"><i>📋</i><span>ประวัติ</span></button>
+    <button id="approveNavBtn" class="hidden" data-tab="approve"><i>✅</i><span>อนุมัติ</span><b id="approveBadge" class="nav-badge hidden">0</b></button>
+  </nav>
+
+  <div id="sheetRoot"></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HomesteelKK • ระบบเวลา ลา และโอที</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f1f5f9; --surface: #ffffff; --surface-2: #f8fafc; --border: #e2e8f0;
+      --text: #0f172a; --text-2: #475569; --muted: #94a3b8;
+      --brand: #1d4ed8; --brand-2: #3b82f6; --brand-soft: #eff6ff; --brand-dark: #0f1f4b;
+      --green: #16a34a; --green-soft: #dcfce7; --red: #dc2626; --red-soft: #fee2e2;
+      --amber: #d97706; --amber-soft: #fef3c7; --violet: #7c3aed; --violet-soft: #ede9fe;
+      --radius: 14px; --shadow: 0 1px 2px rgba(15,23,42,.04), 0 4px 16px rgba(15,23,42,.06);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body { font-family: 'IBM Plex Sans Thai', 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; -webkit-font-smoothing: antialiased; }
+    button, input, select, textarea { font-family: inherit; font-size: 14px; }
+    .hidden { display: none !important; }
+
+    .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 20px;
+      background: radial-gradient(1200px 600px at 10% -10%, #dbeafe 0%, transparent 60%), radial-gradient(900px 500px at 110% 110%, #e0e7ff 0%, transparent 60%), var(--bg); }
+    .login-card { width: 100%; max-width: 400px; background: var(--surface); border-radius: 20px; padding: 32px 28px; box-shadow: 0 20px 50px rgba(15,23,42,.12); }
+    .logo { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-size: 26px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; box-shadow: 0 8px 20px rgba(29,78,216,.35); }
+    .login-card h1 { font-size: 22px; margin: 18px 0 4px; }
+    .login-card p { color: var(--text-2); margin: 0 0 22px; }
+
+    .app { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+    .sidebar { background: var(--brand-dark); color: #cbd5e1; padding: 20px 14px; display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; height: 100vh; }
+    .brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px 20px; }
+    .brand .logo { width: 40px; height: 40px; font-size: 20px; border-radius: 11px; }
+    .brand-name { color: #fff; font-weight: 700; font-size: 16px; line-height: 1.2; }
+    .brand-sub { font-size: 12px; color: #94a3b8; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; color: #cbd5e1; background: none; border: none; cursor: pointer; text-align: left; font-weight: 500; width: 100%; transition: background .15s; }
+    .nav-item:hover { background: rgba(255,255,255,.06); color: #fff; }
+    .nav-item.active { background: rgba(59,130,246,.18); color: #fff; box-shadow: inset 3px 0 0 var(--brand-2); }
+    .nav-item .ico { width: 20px; text-align: center; font-size: 16px; }
+    .nav-item .count { margin-left: auto; background: var(--amber); color: #fff; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; }
+    .sidebar-foot { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid rgba(255,255,255,.08); font-size: 12px; color: #64748b; }
+
+    .main { padding: 22px 28px 40px; min-width: 0; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+    .page-title { font-size: 22px; font-weight: 700; margin: 0; }
+    .page-sub { color: var(--text-2); margin-top: 2px; }
+    .top-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 18px; border: 1px solid rgba(226,232,240,.6); }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .card-title { font-size: 16px; font-weight: 600; margin: 0; }
+    .card-sub { color: var(--text-2); font-size: 13px; }
+
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 10px; border: 1px solid transparent; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #1e40af; }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-danger { background: var(--red); color: #fff; }
+    .btn-ghost { background: var(--surface); border-color: var(--border); color: var(--text); }
+    .btn-ghost:hover { background: var(--surface-2); }
+    .btn-soft-green { background: var(--green-soft); color: #166534; }
+    .btn-soft-red { background: var(--red-soft); color: #991b1b; }
+    .btn-soft-blue { background: var(--brand-soft); color: #1e40af; }
+    .btn-sm { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
+    .btn-block { width: 100%; justify-content: center; padding: 12px; }
+
+    .input, .select, .textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); outline: none; }
+    .input:focus, .select:focus, .textarea:focus { border-color: var(--brand-2); box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+    .select-inline { width: auto; min-width: 260px; }
+    .month-input { width: auto; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .pill-green { background: var(--green-soft); color: #166534; }
+    .pill-red { background: var(--red-soft); color: #991b1b; }
+    .pill-amber { background: var(--amber-soft); color: #92400e; }
+    .pill-blue { background: var(--brand-soft); color: #1e40af; }
+    .pill-violet { background: var(--violet-soft); color: #5b21b6; }
+    .pill-gray { background: #f1f5f9; color: #64748b; }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .stat { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); border: 1px solid rgba(226,232,240,.6); }
+    .stat .s-ico { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-size: 17px; margin-bottom: 10px; }
+    .stat .s-label { color: var(--text-2); font-size: 13px; }
+    .stat .s-val { font-size: 22px; font-weight: 700; margin-top: 2px; }
+    .stat .s-val small { font-size: 13px; font-weight: 500; color: var(--text-2); margin-left: 3px; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: var(--surface-2); color: var(--text-2); font-weight: 600; font-size: 12.5px; text-align: left; padding: 11px 10px; white-space: nowrap; border-bottom: 1px solid var(--border); }
+    td { padding: 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr.row-off td { background: #fafafa; color: var(--muted); }
+    tr.row-exc td { background: #fffbeb; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .mono { font-variant-numeric: tabular-nums; }
+    .date-badge { width: 38px; text-align: center; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); padding: 3px 0; line-height: 1.1; }
+    .date-badge b { display: block; font-size: 15px; color: var(--text); }
+    .date-badge span { font-size: 10.5px; color: var(--text-2); }
+    .note { font-size: 12px; color: #92400e; max-width: 260px; }
+    .empty { text-align: center; padding: 36px 16px; color: var(--muted); }
+    .empty .e-ico { font-size: 32px; margin-bottom: 8px; }
+
+    .emp-head { display: flex; align-items: center; gap: 14px; }
+    .avatar { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 18px; color: #fff; background: linear-gradient(135deg, #6366f1, #3b82f6); flex-shrink: 0; }
+
+    .req-list { display: grid; gap: 12px; }
+    .req { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+    .req-ico { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 19px; }
+    .req-title { font-weight: 600; }
+    .req-meta { color: var(--text-2); font-size: 13px; margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+    .req-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .step { border: 1px solid var(--border); border-radius: 14px; padding: 18px; background: var(--surface); display: flex; flex-direction: column; gap: 10px; }
+    .step-num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); font-weight: 700; }
+    .step h4 { margin: 0; font-size: 15px; }
+    .step p { margin: 0; color: var(--text-2); font-size: 13px; flex: 1; }
+
+    .callout { display: flex; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--brand-soft); color: #1e3a8a; font-size: 13px; margin-bottom: 14px; }
+    .callout.warn { background: var(--amber-soft); color: #78350f; }
+    code { background: #f1f5f9; padding: 1px 6px; border-radius: 6px; font-size: 12.5px; }
+
+    .loading-bar { position: fixed; top: 0; left: 0; height: 3px; width: 100%; z-index: 200; overflow: hidden; }
+    .loading-bar::after { content: ''; position: absolute; left: -40%; width: 40%; height: 100%; background: linear-gradient(90deg, transparent, var(--brand-2), transparent); animation: slide 1s infinite; }
+    @keyframes slide { to { left: 100%; } }
+    .modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,.45); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 150; padding: 16px; }
+    .modal { background: var(--surface); border-radius: 18px; width: 100%; max-width: 460px; padding: 22px; box-shadow: 0 24px 60px rgba(15,23,42,.25); }
+    .modal.wide { max-width: 760px; }
+    .modal h3 { margin: 0 0 6px; font-size: 18px; }
+    .modal p { margin: 0 0 14px; color: var(--text-2); }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+    .toast-wrap { position: fixed; bottom: 22px; right: 22px; display: grid; gap: 10px; z-index: 300; }
+    .toast { background: var(--text); color: #fff; padding: 12px 16px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.2); display: flex; gap: 10px; align-items: center; max-width: 380px; }
+    .toast.error { background: #991b1b; }
+    .toast.success { background: #166534; }
+
+    .mobile-nav { display: none; }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .main { padding: 16px 14px 90px; }
+      .mobile-nav { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); z-index: 100; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
+      .mobile-nav button { background: none; border: none; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; color: var(--text-2); padding: 6px 0; cursor: pointer; position: relative; }
+      .mobile-nav button .ico { font-size: 19px; }
+      .mobile-nav button.active { color: var(--brand); font-weight: 600; }
+      .mobile-nav .dot { position: absolute; top: 2px; right: 20%; background: var(--amber); color: #fff; font-size: 10px; border-radius: 99px; padding: 0 5px; }
+      .select-inline { min-width: 0; width: 100%; }
+      .req { grid-template-columns: auto 1fr; }
+      .req-actions { grid-column: 1 / -1; justify-content: stretch; }
+      .req-actions .btn { flex: 1; justify-content: center; }
+      .toast-wrap { left: 14px; right: 14px; bottom: 80px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loadingBar" class="loading-bar hidden"></div>
+  <div id="toastWrap" class="toast-wrap"></div>
+
+  <!-- Login -->
+  <div id="loginView" class="login-wrap">
+    <div class="login-card">
+      <div class="logo">🏭</div>
+      <h1>HomesteelKK</h1>
+      <p>ระบบจัดการเวลาเข้างาน การลา และโอที<br>สำหรับผู้ดูแลระบบ</p>
+      <label class="card-sub" for="adminSecretInput">รหัสผ่านผู้ดูแล</label>
+      <input type="password" id="adminSecretInput" class="input" placeholder="••••••••" style="margin:6px 0 14px;" autocomplete="current-password" />
+      <button id="loginBtn" class="btn btn-primary btn-block" onclick="login()">เข้าสู่ระบบ</button>
+      <p id="loginErr" style="color:var(--red); font-size:13px; margin:12px 0 0; min-height:18px;"></p>
+    </div>
+  </div>
+
+  <!-- App -->
+  <div id="appView" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">🏭</div>
+        <div><div class="brand-name">HomesteelKK</div><div class="brand-sub">ระบบเวลา ลา และโอที</div></div>
+      </div>
+      <button class="nav-item active" data-tab="overview"><span class="ico">📊</span>ภาพรวม & Exception</button>
+      <button class="nav-item" data-tab="person"><span class="ico">👤</span>ตรวจสอบรายคน</button>
+      <button class="nav-item" data-tab="pending"><span class="ico">⏳</span>อนุมัติ / รับทราบ <span class="count hidden" data-pending-count>0</span></button>
+      <button class="nav-item" data-tab="import"><span class="ico">📥</span>นำเข้าเวลาสแกนนิ้ว</button>
+      <button class="nav-item" data-tab="close"><span class="ico">🔒</span>ปิดงวด & Export</button>
+      <div class="sidebar-foot">
+        <button class="nav-item" onclick="logout()"><span class="ico">↩</span>ออกจากระบบ</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h2 id="pageTitle" class="page-title">ภาพรวม & Exception List</h2>
+          <div id="pageSub" class="page-sub">สรุปข้อมูลและเคสที่ควรตรวจสอบก่อนปิดงวด</div>
+        </div>
+        <div class="top-controls">
+          <input type="month" id="monthPicker" class="input month-input" />
+          <span id="periodPill" class="pill pill-green">เปิดงวดอยู่</span>
+          <button class="btn btn-ghost" onclick="recomputeMonth()">🔄 คำนวณใหม่</button>
+        </div>
+      </div>
+
+      <!-- Tab: Overview -->
+      <section id="tab-overview">
+        <div id="overviewStats" class="stats"></div>
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3 class="card-title">Exception List (รายการที่ควรตรวจสอบ)</h3>
+              <div id="overviewUpdated" class="card-sub"></div>
+            </div>
+          </div>
+          <div id="exceptionTable"></div>
+        </div>
+      </section>
+
+      <!-- Tab: Person -->
+      <section id="tab-person" class="hidden">
+        <div class="card">
+          <div class="card-head" style="margin-bottom:0;">
+            <div id="empHead" class="emp-head"></div>
+            <select id="empSelect" class="select select-inline"></select>
+          </div>
+        </div>
+        <div id="personStats" class="stats"></div>
+        <div class="card">
+          <div class="card-head">
+            <h3 class="card-title">ตารางเวลารายวัน</h3>
+            <div class="card-sub">กด <b>แก้ไข</b> เพื่อปรับเวลาพร้อมบันทึก Audit Log (ไม่แตะข้อมูลดิบ)</div>
+          </div>
+          <div id="personTable"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3 class="card-title">ใบลาและโอทีของเดือนนี้</h3></div>
+          <div id="personRequests"></div>
+        </div>
+      </section>
+
+      <!-- Tab: Pending & Acknowledge -->
+      <section id="tab-pending" class="hidden">
+        <div class="card">
+          <div class="card-head"><h3 class="card-title">🌴 ลาพักร้อนรออนุมัติ</h3><span id="pendVacCount" class="pill pill-amber">0 รายการ</span></div>
+          <div id="pendingVacations" class="req-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3 class="card-title">⏰ โอทีรออนุมัติ</h3><span id="pendOtCount" class="pill pill-amber">0 รายการ</span></div>
+          <div id="pendingOts" class="req-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3 class="card-title">📋 ลากิจ / ลาป่วย (แจ้งเพื่อทราบ)</h3><span id="unackCount" class="pill pill-blue">0 รายการ</span></div>
+          <div id="unackLeaves" class="req-list"></div>
+        </div>
+      </section>
+
+      <!-- Tab: Import -->
+      <section id="tab-import" class="hidden">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3 class="card-title">นำเข้าเวลาสแกนนิ้วแบบ Manual (เฟส 1)</h3>
+              <div class="card-sub">เก็บลง Attendance_Raw_YYYY (ข้อมูลดิบห้ามแก้) และคำนวณสรุปรายวันให้อัตโนมัติ</div>
+            </div>
+          </div>
+          <div class="callout">
+            <span>💡</span>
+            <div>วางข้อมูลบรรทัดละ 1 การสแกน: <code>รหัสพนักงานหรือรหัสนิ้ว, yyyy-MM-dd HH:mm</code> หรือ <code>1, 17/11/2569 07:55</code><br>
+              ข้อมูลซ้ำจะถูกข้ามให้อัตโนมัติ วางซ้ำได้ปลอดภัยครับ</div>
+          </div>
+          <textarea id="importInput" class="textarea mono" rows="10" placeholder="1, 2026-11-17 07:55&#10;1, 2026-11-17 17:05"></textarea>
+          <div style="display:flex; gap:10px; align-items:center; margin-top:12px;">
+            <button class="btn btn-primary" onclick="submitImport()">📥 นำเข้าและคำนวณ</button>
+            <span id="importPreview" class="card-sub"></span>
+          </div>
+          <div id="importResult" style="margin-top:14px;"></div>
+        </div>
+      </section>
+
+      <!-- Tab: Close & Export -->
+      <section id="tab-close" class="hidden">
+        <div class="callout warn">
+          <span>⚠️</span>
+          <div>ขั้นตอนสิ้นเดือน: ตรวจ <b>Exception List</b> → ตรวจ <b>อนุมัติ/รับทราบ</b> → กด <b>ปิดงวด (Lock)</b> → ดาวน์โหลดไฟล์วางใน Excel เงินเดือน</div>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <h4>คำนวณข้อมูลล่าสุด</h4>
+            <p>รวมเวลาสแกน ใบลา และโอทีทั้งหมดเป็นสรุปรายวัน (คงค่าที่ Admin เคยแก้ไขไว้)</p>
+            <button class="btn btn-ghost" onclick="recomputeMonth()">🔄 คำนวณใหม่</button>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <h4>Export สำหรับ Excel</h4>
+            <p>ดาวน์โหลดไฟล์ <b>Time Clock</b> (15 คอลัมน์ตรง Excel) และไฟล์ <b>สรุปวันลา/โอทีรายคน</b></p>
+            <button class="btn btn-success" onclick="downloadTimeClock()">⬇️ Time Clock (CSV)</button>
+            <button class="btn btn-soft-blue" onclick="downloadLeaveOtSummary()">⬇️ สรุปลา/โอทีรายคน (CSV)</button>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <h4>สถานะงวดเงินเดือน</h4>
+            <p>ปิดงวด (Lock) เมื่อตรวจสอบครบแล้ว หากต้องแก้ย้อนหลังสามารถปลดล็อกพร้อมระบุเหตุผลลง Audit Log ได้</p>
+            <button id="lockBtn" class="btn btn-danger" onclick="lockCurrentPeriod()">🔒 ปิดและล็อกงวด</button>
+            <button id="unlockBtn" class="btn btn-ghost hidden" onclick="unlockCurrentPeriod()">🔓 ปลดล็อกงวด</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <nav class="mobile-nav">
+      <button class="active" data-tab="overview"><span class="ico">📊</span>ภาพรวม</button>
+      <button data-tab="person"><span class="ico">👤</span>รายคน</button>
+      <button data-tab="pending"><span class="ico">⏳</span>อนุมัติ<span class="dot hidden" data-pending-count>0</span></button>
+      <button data-tab="import"><span class="ico">📥</span>นำเข้า</button>
+      <button data-tab="close"><span class="ico">🔒</span>ปิดงวด</button>
+    </nav>
+  </div>
+
+  <div id="modalRoot"></div>
+
+  <script>
+    const TAB_META = {
+      overview: ['ภาพรวม & Exception List', 'สรุปข้อมูลและเคสที่ควรตรวจสอบก่อนปิดงวด'],
+      person: ['ตรวจสอบรายคน', 'เลือกพนักงานเพื่อตรวจเวลาเข้า-ออก ใบลา โอที และแก้ไขเวลา'],
+      pending: ['อนุมัติ / รับทราบ', 'อนุมัติลาพักร้อน-โอที และกดรับทราบใบลากิจ-ลาป่วย'],
+      import: ['นำเข้าเวลาสแกนนิ้ว', 'สำหรับช่วงที่ดึงข้อมูลแบบ Manual'],
+      close: ['ปิดงวด & Export', 'ส่งออกไฟล์เข้า Excel เงินเดือนและล็อกงวด']
+    };
+    const DOW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+    const MONTH_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    const MONTH_TH_FULL = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+
+    let SECRET = sessionStorage.getItem('hs_admin') || '';
+    let STATE = { employees: [], period: null, currentTab: 'overview', locked: false };
+    let loadingCount = 0;
+
+    const $ = id => document.getElementById(id);
+    function esc(v) {
+      return String(v === undefined || v === null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function hm(mins) { const m = Math.max(0, Math.round(Number(mins) || 0)); return m ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` : '-'; }
+    function num(v) { const n = Number(v) || 0; return n ? (Math.round(n * 100) / 100).toString() : '-'; }
+    function ymNow() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+    function ymLabel(ym) { const [y, m] = ym.split('-'); return `${MONTH_TH_FULL[+m - 1]} ${+y + 543}`; }
+    function dateParts(ds) { const d = new Date(ds + 'T00:00:00'); return { day: d.getDate(), dow: DOW[d.getDay()], mon: MONTH_TH[d.getMonth()] }; }
+    function shortDate(ds) { if (!ds) return '-'; const p = dateParts(ds); return `${p.dow} ${p.day} ${p.mon}`; }
+    function initials(name) { return esc(String(name || '?').trim().charAt(0).toUpperCase()); }
+
+    function setLoading(on) { loadingCount += on ? 1 : -1; $('loadingBar').classList.toggle('hidden', loadingCount <= 0); }
+    function call(fn, ...args) {
+      return new Promise((resolve, reject) => {
+        setLoading(true);
+        google.script.run
+          .withSuccessHandler(r => { setLoading(false); resolve(r); })
+          .withFailureHandler(e => { setLoading(false); reject(e); })[fn](SECRET, ...args);
+      });
+    }
+    function toast(msg, type = '') {
+      const el = document.createElement('div');
+      el.className = 'toast ' + type;
+      el.innerHTML = `<span>${type === 'error' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️'}</span><span>${esc(msg)}</span>`;
+      $('toastWrap').appendChild(el);
+      setTimeout(() => el.remove(), 4200);
+    }
+    function modal({ title, body = '', html = '', confirmText = 'ยืนยัน', confirmClass = 'btn-primary', input = false, inputPlaceholder = '', wide = false, hideConfirm = false }) {
+      return new Promise(resolve => {
+        const root = $('modalRoot');
+        root.innerHTML = `<div class="modal-bg"><div class="modal ${wide ? 'wide' : ''}">
+          <h3>${esc(title)}</h3>${body ? `<p>${esc(body)}</p>` : ''}${html}
+          ${input ? `<textarea id="modalInput" class="textarea" rows="3" placeholder="${esc(inputPlaceholder)}"></textarea>` : ''}
+          <div class="modal-actions">
+            <button class="btn btn-ghost" data-act="cancel">${hideConfirm ? 'ปิด' : 'ยกเลิก'}</button>
+            ${hideConfirm ? '' : `<button class="btn ${confirmClass}" data-act="ok">${esc(confirmText)}</button>`}
+          </div></div></div>`;
+        const close = val => { root.innerHTML = ''; resolve(val); };
+        root.querySelector('[data-act="cancel"]').onclick = () => close(null);
+        const ok = root.querySelector('[data-act="ok"]');
+        if (ok) ok.onclick = () => close(input ? ($('modalInput').value || '') : true);
+        root.querySelector('.modal-bg').onclick = e => { if (e.target.classList.contains('modal-bg')) close(null); };
+      });
+    }
+    function emptyState(ico, text) { return `<div class="empty"><div class="e-ico">${ico}</div>${esc(text)}</div>`; }
+
+    window.addEventListener('load', () => {
+      $('monthPicker').value = ymNow();
+      $('monthPicker').addEventListener('change', () => loadInit());
+      $('empSelect').addEventListener('change', () => loadPerson());
+      $('adminSecretInput').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+      $('importInput').addEventListener('input', () => {
+        const n = parseImport($('importInput').value).length;
+        $('importPreview').textContent = n ? `พบ ${n} บรรทัด` : '';
+      });
+      document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+      if (SECRET) loadInit(true);
+    });
+
+    function login() { const v = $('adminSecretInput').value.trim(); if (!v) return; SECRET = v; $('loginBtn').disabled = true; loadInit(true); }
+    function logout() { sessionStorage.removeItem('hs_admin'); SECRET = ''; location.reload(); }
+
+    async function loadInit(fromLogin) {
+      try {
+        const res = await call('adminGetInitData', $('monthPicker').value);
+        sessionStorage.setItem('hs_admin', SECRET);
+        $('loginView').classList.add('hidden');
+        $('appView').classList.remove('hidden');
+
+        STATE.employees = res.employees;
+        STATE.period = res.period;
+        STATE.locked = String(res.period.status).toLowerCase() === 'locked';
+
+        const pill = $('periodPill');
+        pill.className = 'pill ' + (STATE.locked ? 'pill-red' : 'pill-green');
+        pill.textContent = STATE.locked ? 'ล็อกงวดแล้ว' : 'เปิดงวดอยู่';
+        $('lockBtn').classList.toggle('hidden', STATE.locked);
+        $('unlockBtn').classList.toggle('hidden', !STATE.locked);
+
+        renderEmpSelect();
+        renderOverview(res.overview);
+        renderPending(res.pendingVacations, res.pendingOTs, res.unackLeaves);
+        if (STATE.currentTab === 'person') loadPerson();
+      } catch (err) {
+        if (fromLogin) {
+          sessionStorage.removeItem('hs_admin');
+          $('loginView').classList.remove('hidden');
+          $('appView').classList.add('hidden');
+          $('loginErr').textContent = err.message;
+        } else toast(err.message, 'error');
+      } finally { $('loginBtn').disabled = false; }
+    }
+
+    function switchTab(tab) {
+      STATE.currentTab = tab;
+      document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      Object.keys(TAB_META).forEach(t => $('tab-' + t).classList.toggle('hidden', t !== tab));
+      $('pageTitle').textContent = TAB_META[tab][0];
+      $('pageSub').textContent = TAB_META[tab][1] + ' • ' + ymLabel($('monthPicker').value);
+      if (tab === 'person') loadPerson();
+    }
+
+    function statCard(icon, bg, label, val, unit) {
+      return `<div class="stat"><div class="s-ico" style="background:${bg}">${icon}</div><div class="s-label">${esc(label)}</div><div class="s-val">${esc(val)}<small>${esc(unit || '')}</small></div></div>`;
+    }
+
+    function renderOverview(ov) {
+      const s = ov.stats;
+      $('overviewStats').innerHTML = [
+        statCard('⚠️', 'var(--amber-soft)', 'Exception List', s.exceptionCount, 'รายการ'),
+        statCard('⏰', 'var(--red-soft)', 'มาสาย', s.lateCount, 'ครั้ง'),
+        statCard('🚫', '#f1f5f9', 'ขาดงานรวม', s.absentDays, 'วัน'),
+        statCard('📝', 'var(--brand-soft)', 'ลารวม', s.leaveHours, 'ชม.'),
+        statCard('💪', 'var(--green-soft)', 'โอทีจ่ายจริง', s.otPaidHours, 'ชม.')
+      ].join('');
+
+      $('overviewUpdated').textContent = ov.computed ? `คำนวณล่าสุด: ${ov.lastUpdated}` : 'ยังไม่มีข้อมูลสรุปของเดือนนี้ — กด "คำนวณใหม่" หรือนำเข้าเวลาสแกนนิ้ว';
+
+      if (!ov.exceptions.length) {
+        $('exceptionTable').innerHTML = emptyState(ov.computed ? '🎉' : '📭', ov.computed ? 'ไม่มีเคสผิดปกติในเดือนนี้' : 'ยังไม่มีข้อมูล');
+        return;
+      }
+      $('exceptionTable').innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>วันที่</th><th>พนักงาน</th><th>เข้า-ออก</th><th>ประเภท</th><th>รายละเอียด</th><th></th></tr></thead>
+        <tbody>${ov.exceptions.map(r => `
+          <tr>
+            <td class="mono">${esc(shortDate(r.work_date))}</td>
+            <td><b>${esc(r.name)}</b> <span class="card-sub">#${esc(r.employee_id)}</span></td>
+            <td class="mono">${esc(r.first_in || '-')} / ${esc(r.last_out || '-')}</td>
+            <td><span class="pill pill-amber">${esc(r.code)}</span></td>
+            <td class="note">${esc(r.detail)}</td>
+            <td style="white-space:nowrap;">
+              ${(r.kind === 'DAILY' || r.kind === 'MISSED_SCAN') ? `<button class="btn btn-soft-blue btn-sm" onclick="openCorrectModal('${esc(r.work_date)}','${esc(r.employee_id)}','${esc(r.name)}','${esc(r.first_in)}','${esc(r.last_out)}')">✏️ แก้เวลา</button>` : ''}
+              <button class="btn btn-ghost btn-sm" onclick="openPerson('${esc(r.employee_id)}')">ดูรายคน</button>
+            </td>
+          </tr>`).join('')}</tbody></table></div>`;
+    }
+
+    function openPerson(empId) { $('empSelect').value = empId; switchTab('person'); }
+
+    function renderEmpSelect() {
+      const sel = $('empSelect'), prev = sel.value;
+      sel.innerHTML = STATE.employees.length
+        ? STATE.employees.map(e => `<option value="${esc(e.employee_id)}">${esc(e.code)} • ${esc(e.name)}${e.department ? ' (' + esc(e.department) + ')' : ''}</option>`).join('')
+        : '<option value="">ยังไม่มีรายชื่อพนักงานในชีต Employees</option>';
+      if (prev && STATE.employees.some(e => String(e.employee_id) === prev)) sel.value = prev;
+    }
+
+    async function loadPerson() {
+      const empId = $('empSelect').value;
+      if (!empId) { $('personTable').innerHTML = emptyState('👥', 'กรุณาเพิ่มพนักงานในชีต Employees ก่อนครับ'); return; }
+      try { renderPerson(await call('adminGetIndividualTimesheet', empId, $('monthPicker').value)); }
+      catch (err) { toast(err.message, 'error'); }
+    }
+
+    function renderPerson(data) {
+      const e = data.employee, s = data.summary, q = data.quotas;
+      $('empHead').innerHTML = `<div class="avatar">${initials(e.name)}</div>
+        <div><div style="font-weight:700; font-size:16px;">${esc(e.name)}</div>
+        <div class="card-sub">รหัส ${esc(e.code || e.employee_id)}${e.department ? ' • ' + esc(e.department) : ''} • ลากิจใช้ไป ${q.personalUsedYear}/${q.personalLimit} วัน • ลาป่วยใช้ไป ${q.sickUsedYear}/${q.sickLimit} วัน</div></div>`;
+
+      $('personStats').innerHTML = [
+        statCard('📅', 'var(--brand-soft)', 'มาทำงาน', s.workDays, 'วัน'),
+        statCard('⏰', 'var(--red-soft)', 'มาสาย', s.lateCount, `ครั้ง (${s.totalLateMin} น.)`),
+        statCard('🚫', '#f1f5f9', 'ขาดงาน', (s.totalAbsentMin / 480).toFixed(1).replace('.0', ''), 'วัน'),
+        statCard('📝', 'var(--brand-soft)', 'ลา', s.totalLeaveHours, 'ชม.'),
+        statCard('💪', 'var(--green-soft)', 'โอทีจ่ายจริง', s.totalOtPaid, `/ ${s.totalOtApproved} ชม.`),
+        `<div class="stat"><div class="s-ico" style="background:${s.diligenceEligible ? 'var(--green-soft)' : 'var(--red-soft)'}">🏅</div><div class="s-label">เบี้ยขยัน</div>
+          <div class="s-val" style="font-size:18px; color:${s.diligenceEligible ? 'var(--green)' : 'var(--red)'}">${s.diligenceEligible ? 'ผ่านเกณฑ์' : 'ไม่ผ่าน'}</div></div>`
+      ].join('');
+
+      $('personTable').innerHTML = data.daily.length ? `<div class="table-wrap"><table>
+        <thead><tr><th>วันที่</th><th>สถานะ</th><th>เข้า</th><th>ออก</th><th class="num">ทำงาน</th><th class="num">สาย</th><th class="num">ลา (ชม.)</th><th class="num">OT จ่าย</th><th>หมายเหตุ</th><th></th></tr></thead>
+        <tbody>${data.daily.map(r => {
+          const p = dateParts(r.work_date);
+          const cls = r.flags ? 'row-exc' : (r.is_off_day && !r.first_in ? 'row-off' : '');
+          return `<tr class="${cls}">
+            <td><div class="date-badge"><b>${p.day}</b><span>${p.dow}</span></div></td>
+            <td><span class="pill ${r.status === 'CORRECTED' ? 'pill-violet' : r.flags ? 'pill-amber' : Number(r.absent_min) > 0 ? 'pill-red' : r.is_off_day ? 'pill-gray' : 'pill-green'}">${esc(r.status)}</span></td>
+            <td class="mono">${esc(r.first_in || '-')}</td>
+            <td class="mono">${esc(r.last_out || '-')}</td>
+            <td class="num">${hm(r.work_minutes)}</td>
+            <td class="num">${hm(r.late_min)}</td>
+            <td class="num">${num(r.leave_hours)}</td>
+            <td class="num"><b>${num(r.ot_paid_hours)}</b></td>
+            <td class="note">${esc(r.admin_note || r.flags || '')}</td>
+            <td><button class="btn btn-ghost btn-sm" onclick="openCorrectModal('${esc(r.work_date)}','${esc(r.employee_id)}','${esc(e.name)}','${esc(r.first_in)}','${esc(r.last_out)}','${esc(r.admin_note)}')">✏️ แก้ไข</button></td>
+          </tr>`;
+        }).join('')}</tbody></table></div>` : emptyState('📭', 'ยังไม่มีข้อมูลรายวันของเดือนนี้');
+
+      const items = [
+        ...data.leaves.map(l => ({ kind: 'leave', d: l.start_date, l })),
+        ...data.ots.map(o => ({ kind: 'ot', d: o.ot_date, o }))
+      ].sort((a, b) => String(a.d).localeCompare(String(b.d)));
+      $('personRequests').innerHTML = items.length ? `<div class="req-list">${items.map(it => it.kind === 'leave' ? leaveCard(it.l, 'NONE') : otCard(it.o, false)).join('')}</div>`
+        : emptyState('🗂️', 'ไม่มีใบลาหรือโอทีในเดือนนี้');
+    }
+
+    async function openCorrectModal(workDate, empId, empName, firstIn, lastOut, note) {
+      if (STATE.locked) { toast('งวดนี้ถูกล็อกแล้ว กรุณาปลดล็อกงวดก่อนแก้ไขครับ', 'error'); return; }
+      const html = `
+        <div class="grid-2">
+          <div><label class="card-sub">เวลาเข้า (HH:mm)</label><input id="cIn" type="time" class="input" value="${esc(firstIn || '')}" /></div>
+          <div><label class="card-sub">เวลาออก (HH:mm)</label><input id="cOut" type="time" class="input" value="${esc(lastOut || '')}" /></div>
+        </div>
+        <div style="margin-bottom:10px;"><label class="card-sub">หมายเหตุ (แสดงในตาราง)</label><input id="cNote" class="input" value="${esc(note || '')}" placeholder="เช่น ลืมสแกนเข้า / ออกส่งของต่างจังหวัด" /></div>
+        <div><label class="card-sub">เหตุผลการแก้ไข (บันทึกลง Audit Log) *</label><input id="cReason" class="input" placeholder="ระบุเหตุผลการปรับแก้เวลา" /></div>`;
+      const root = $('modalRoot');
+      root.innerHTML = `<div class="modal-bg"><div class="modal">
+        <h3>แก้ไขเวลา • ${esc(empName)}</h3><p>วันที่ ${esc(shortDate(workDate))} (จะไม่แก้ไขข้อมูลสแกนดิบ)</p>${html}
+        <div class="modal-actions"><button class="btn btn-ghost" id="cCancel">ยกเลิก</button><button class="btn btn-primary" id="cSave">บันทึกการแก้ไข</button></div>
+      </div></div>`;
+      $('cCancel').onclick = () => { root.innerHTML = ''; };
+      $('cSave').onclick = async () => {
+        const reason = $('cReason').value.trim();
+        if (!reason) { toast('กรุณาระบุเหตุผลการแก้ไขครับ', 'error'); return; }
+        try {
+          await call('adminCorrectAttendance', workDate, empId, $('cIn').value, $('cOut').value, $('cNote').value.trim(), reason);
+          root.innerHTML = '';
+          toast('บันทึกการแก้ไขเวลาและ Audit Log เรียบร้อย', 'success');
+          loadInit();
+        } catch (err) { toast(err.message, 'error'); }
+      };
+    }
+
+    function leaveCard(l, mode) {
+      const icon = l.leave_type === 'ลาป่วย' ? '🤒' : l.leave_type === 'ลาพักร้อน' ? '🌴' : '💼';
+      const dur = l.duration_mode === 'HOURS' ? `${l.hours} ชม.` : l.duration_mode === 'HALF_DAY' ? 'ครึ่งวัน' : `${l.days} วัน`;
+      const dText = l.start_date === l.end_date ? shortDate(l.start_date) : `${shortDate(l.start_date)} – ${shortDate(l.end_date)}`;
+      return `<div class="req">
+        <div class="req-ico" style="background:var(--brand-soft)">${icon}</div>
+        <div>
+          <div class="req-title">${esc(l.name)} • ${esc(l.leave_type)} ${esc(dur)} <span class="pill pill-gray">${esc(l.status)}</span></div>
+          <div class="req-meta"><span>📅 ${esc(dText)}</span><span>💬 ${esc(l.reason || '-')}</span>${l.flags ? `<span style="color:var(--amber);">⚠️ ${esc(l.flags)}</span>` : ''}</div>
+        </div>
+        <div class="req-actions">
+          ${l.attachment_file_id ? `<button class="btn btn-ghost btn-sm" onclick="viewAttachment('${esc(l.attachment_file_id)}')">📎 ดูรูป</button>` : ''}
+          ${mode === 'DECIDE' ? `<button class="btn btn-soft-red btn-sm" onclick="decide('LEAVE','${esc(l.request_id)}',false)">ไม่อนุมัติ</button><button class="btn btn-success btn-sm" onclick="decide('LEAVE','${esc(l.request_id)}',true)">✓ อนุมัติ</button>` : ''}
+          ${mode === 'ACK' ? `<button class="btn btn-soft-blue btn-sm" onclick="ackLeave('${esc(l.request_id)}')">👍 รับทราบ</button>` : ''}
+        </div>
+      </div>`;
+    }
+
+    function otCard(o, canDecide) {
+      return `<div class="req">
+        <div class="req-ico" style="background:var(--green-soft)">⏰</div>
+        <div>
+          <div class="req-title">${esc(o.name)} • โอที ${esc(o.requested_hours)} ชม. <span class="pill pill-gray">${esc(o.status)}</span></div>
+          <div class="req-meta"><span>📅 ${esc(shortDate(o.ot_date))} • ${esc(o.requested_start)}–${esc(o.requested_end)}</span><span>🔧 ${esc(o.job_reference || '-')}</span></div>
+        </div>
+        <div class="req-actions">
+          ${canDecide ? `<button class="btn btn-soft-red btn-sm" onclick="decide('OT','${esc(o.request_id)}',false)">ไม่อนุมัติ</button><button class="btn btn-success btn-sm" onclick="decide('OT','${esc(o.request_id)}',true)">✓ อนุมัติ</button>` : ''}
+        </div>
+      </div>`;
+    }
+
+    function renderPending(vacs, ots, unacks) {
+      const total = vacs.length + ots.length + unacks.length;
+      document.querySelectorAll('[data-pending-count]').forEach(el => { el.textContent = total; el.classList.toggle('hidden', total === 0); });
+      $('pendVacCount').textContent = `${vacs.length} รายการ`;
+      $('pendOtCount').textContent = `${ots.length} รายการ`;
+      $('unackCount').textContent = `${unacks.length} รายการ`;
+      $('pendingVacations').innerHTML = vacs.length ? vacs.map(l => leaveCard(l, 'DECIDE')).join('') : emptyState('✨', 'ไม่มีใบลาพักร้อนค้างอนุมัติ');
+      $('pendingOts').innerHTML = ots.length ? ots.map(o => otCard(o, true)).join('') : emptyState('✨', 'ไม่มีคำขอโอทีค้างอนุมัติ');
+      $('unackLeaves').innerHTML = unacks.length ? unacks.map(l => leaveCard(l, 'ACK')).join('') : emptyState('✨', 'ไม่มีใบลาค้างรับทราบ');
+    }
+
+    async function decide(type, id, approved) {
+      let reason = '';
+      if (!approved) {
+        reason = await modal({ title: 'ไม่อนุมัติรายการนี้', body: 'ระบุเหตุผลสั้นๆ เพื่อแจ้งพนักงานทาง LINE', input: true, confirmText: 'ยืนยันไม่อนุมัติ', confirmClass: 'btn-danger' });
+        if (reason === null) return;
+      }
+      try { await call('adminDecideItem', type, id, approved, reason); toast('บันทึกเรียบร้อยแล้ว', 'success'); loadInit(); }
+      catch (err) { toast(err.message, 'error'); }
+    }
+
+    async function ackLeave(id) {
+      try { await call('adminAcknowledgeLeave', id); toast('กดรับทราบเรียบร้อยแล้ว', 'success'); loadInit(); }
+      catch (err) { toast(err.message, 'error'); }
+    }
+
+    async function viewAttachment(fileId) {
+      try {
+        const url = await call('adminGetAttachment', fileId);
+        modal({ title: 'ไฟล์แนบ', html: `<img src="${esc(url)}" style="width:100%; max-height:70vh; object-fit:contain; border-radius:10px;" />`, wide: true, hideConfirm: true });
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    function parseImport(text) {
+      return text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+        const p = l.split(/\s*[,\t;]\s*/);
+        if (p.length === 1) { const m = l.match(/^(\S+)\s+(.+)$/); return m ? { id: m[1], timestamp: m[2] } : { id: '', timestamp: '' }; }
+        return { id: p[0], timestamp: p.slice(1).join(' ') };
+      });
+    }
+
+    async function submitImport() {
+      const rows = parseImport($('importInput').value);
+      if (!rows.length) { toast('กรุณาวางข้อมูลก่อนครับ', 'error'); return; }
+      try {
+        const res = await call('adminImportManualAttendance', rows);
+        $('importResult').innerHTML = `<div class="callout"><span>✅</span><div>นำเข้าใหม่ <b>${res.inserted}</b> รายการ • ข้ามซ้ำ <b>${res.skipped}</b> รายการ</div></div>`;
+        toast('นำเข้าและคำนวณเรียบร้อยแล้ว', 'success');
+        $('importInput').value = '';
+        loadInit();
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    async function recomputeMonth() {
+      try { const res = await call('adminRecomputeMonth', $('monthPicker').value); toast(`คำนวณเรียบร้อย (${res.rowsGenerated} แถว)`, 'success'); loadInit(); }
+      catch (err) { toast(err.message, 'error'); }
+    }
+
+    function saveCsvFile(csv, filename) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+      a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    async function downloadTimeClock() {
+      const ym = $('monthPicker').value;
+      try { saveCsvFile(await call('adminExportTimeClockCsv', ym), `Time_Clock_${ym}.csv`); toast('ดาวน์โหลด Time Clock แล้ว', 'success'); }
+      catch (err) { toast(err.message, 'error'); }
+    }
+
+    async function downloadLeaveOtSummary() {
+      const ym = $('monthPicker').value;
+      try { saveCsvFile(await call('adminExportLeaveOtSummaryCsv', ym), `Leave_OT_Summary_${ym}.csv`); toast('ดาวน์โหลดสรุปลา/โอทีแล้ว', 'success'); }
+      catch (err) { toast(err.message, 'error'); }
+    }
+
+    async function lockCurrentPeriod() {
+      const ym = $('monthPicker').value;
+      const ok = await modal({ title: `ปิดและล็อกงวด ${ymLabel(ym)}?`, body: 'หลังล็อกแล้วจะไม่สามารถแก้ไขใบลา โอที หรือเวลาของเดือนนี้ได้จนกว่าจะปลดล็อก', confirmText: '🔒 ยืนยันล็อกงวด', confirmClass: 'btn-danger' });
+      if (!ok) return;
+      try { await call('adminSetPeriodStatus', ym, 'locked', 'ปิดงวดเงินเดือน'); toast('ล็อกงวดเรียบร้อยแล้ว', 'success'); loadInit(); }
+      catch (err) { toast(err.message, 'error'); }
+    }
+
+    async function unlockCurrentPeriod() {
+      const ym = $('monthPicker').value;
+      const reason = await modal({ title: `ปลดล็อกงวด ${ymLabel(ym)}`, body: 'กรุณาระบุเหตุผลการปลดล็อก (จะบันทึกใน Audit Log)', input: true, confirmText: '🔓 ปลดล็อก', confirmClass: 'btn-primary' });
+      if (!reason) return;
+      try { await call('adminSetPeriodStatus', ym, 'open', reason); toast('ปลดล็อกงวดเรียบร้อยแล้ว', 'success'); loadInit(); }
+      catch (err) { toast(err.message, 'error'); }
+    }
+  </script>
+</body>
+</html>

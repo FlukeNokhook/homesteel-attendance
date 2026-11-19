@@ -1,0 +1,542 @@
+/* HomesteelKK LIFF — หน้าจอพนักงานและหัวหน้างาน */
+
+let ID_TOKEN = '';
+let CURRENT_EMP = null;
+let DATA = { quotas: {}, leaves: [], ots: [], attendance: { daily: [], missedScans: [] }, pending_vacations: [], unack_leaves: [], pending_ots: [] };
+let LEAVE_HOURS = 2;
+let ATTACHMENT = '';
+let LATER_CERT_REQ_ID = '';
+
+const DOW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+const MONTH_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const $ = id => document.getElementById(id);
+
+function esc(v) {
+  return String(v === undefined || v === null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function thaiDate(ds) {
+  if (!ds) return '-';
+  const d = new Date(ds + 'T00:00:00');
+  return `${DOW[d.getDay()]} ${d.getDate()} ${MONTH_TH[d.getMonth()]} ${String(d.getFullYear() + 543).slice(2)}`;
+}
+function minsToText(mins) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h && m ? `${h} ชม. ${m} นาที` : h ? `${h} ชม.` : `${m} นาที`;
+}
+function radioVal(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : '';
+}
+function toast(msg, isError) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'toast' + (isError ? ' error' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.add('hidden'), 3500);
+}
+function sheet({ title, body = '', html = '', confirmText = 'ตกลง', confirmClass = 'btn-primary', cancelText = 'ยกเลิก', input = false, placeholder = '', hideCancel = false }) {
+  return new Promise(resolve => {
+    const root = $('sheetRoot');
+    root.innerHTML = `<div class="sheet-bg"><div class="sheet"><div class="grab"></div>
+      ${html}${title ? `<h3>${esc(title)}</h3>` : ''}${body ? `<p>${esc(body)}</p>` : ''}
+      ${input ? `<textarea id="sheetInput" class="input" rows="3" placeholder="${esc(placeholder)}"></textarea>` : ''}
+      <div class="sheet-actions">
+        ${hideCancel ? '' : `<button class="btn btn-ghost" data-act="cancel">${esc(cancelText)}</button>`}
+        <button class="btn ${confirmClass}" data-act="ok">${esc(confirmText)}</button>
+      </div></div></div>`;
+    const close = v => { root.innerHTML = ''; resolve(v); };
+    const cancel = root.querySelector('[data-act="cancel"]');
+    if (cancel) cancel.onclick = () => close(null);
+    root.querySelector('[data-act="ok"]').onclick = () => close(input ? $('sheetInput').value : true);
+    root.querySelector('.sheet-bg').onclick = e => { if (e.target.classList.contains('sheet-bg')) close(null); };
+  });
+}
+
+/* ================= API ================= */
+function ensureFreshToken() {
+  const decoded = liff.getDecodedIDToken();
+  if (decoded && decoded.exp * 1000 < Date.now() + 60 * 1000) {
+    liff.logout();
+    liff.login({ redirectUri: location.href });
+    throw new Error('กำลังเชื่อมต่อ LINE ใหม่อีกครั้ง...');
+  }
+  ID_TOKEN = liff.getIDToken();
+}
+
+async function callApi(action, payload = {}) {
+  ensureFreshToken();
+  let res;
+  try {
+    res = await fetch(window.HOMESTEEL_CONFIG.GAS_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, id_token: ID_TOKEN, payload })
+    });
+  } catch (e) {
+    throw new Error('เชื่อมต่ออินเทอร์เน็ตไม่สำเร็จ รบกวนตรวจสอบสัญญาณแล้วลองใหม่อีกครั้งนะครับ');
+  }
+  const data = await res.json();
+  if (data.status !== 'ok') {
+    if (data.code === 'TOKEN_EXPIRED') {
+      liff.logout();
+      liff.login({ redirectUri: location.href });
+    }
+    const err = new Error(data.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งครับ');
+    err.code = data.code;
+    err.line_user_id = data.line_user_id;
+    throw err;
+  }
+  return data;
+}
+
+/* ================= Init ================= */
+window.addEventListener('load', async () => {
+  const today = todayIso();
+  $('leaveStart').value = today;
+  $('leaveEnd').value = today;
+  $('otDate').value = today;
+  $('msDate').value = today;
+  bindForm();
+  const h = new Date().getHours();
+  $('greeting').textContent = h < 12 ? 'สวัสดีตอนเช้าครับ ☀️' : h < 17 ? 'สวัสดีตอนบ่ายครับ 🌤️' : 'สวัสดีตอนเย็นครับ 🌙';
+
+  try {
+    await liff.init({ liffId: window.HOMESTEEL_CONFIG.LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+    const profile = liff.getDecodedIDToken() || {};
+    if (profile.picture) $('avatar').innerHTML = `<img src="${esc(profile.picture)}" alt="" />`;
+    if (profile.name) $('userName').textContent = profile.name;
+
+    await loadData();
+
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (tab === 'approve' && isApprover()) switchTab('approve');
+    else if (tab === 'ot') switchTab('ot');
+    else if (tab === 'attendance') switchTab('attendance');
+    else if (tab === 'history') switchTab('history');
+  } catch (err) {
+    showStatusError(err.message);
+  }
+});
+
+function showStatusError(msg) {
+  $('statusSpinner').classList.add('hidden');
+  $('statusMsg').textContent = msg;
+  $('retryBtn').classList.remove('hidden');
+}
+function isApprover() {
+  const r = String((CURRENT_EMP && CURRENT_EMP.role) || '').toLowerCase();
+  return r === 'supervisor' || r === 'admin';
+}
+
+async function loadData() {
+  try {
+    const data = await callApi('liff_me');
+    CURRENT_EMP = data.employee;
+    DATA = data;
+    $('userName').textContent = CURRENT_EMP.name;
+    $('userDept').textContent = [CURRENT_EMP.department, `รหัส ${CURRENT_EMP.code}`].filter(Boolean).join(' • ');
+    $('statusBox').classList.add('hidden');
+    $('mainContent').classList.remove('hidden');
+    $('bottomNav').classList.remove('hidden');
+
+    updateLeaveForm();
+    renderHistory();
+    renderAttendance();
+    renderJobSuggest();
+    if (isApprover()) {
+      $('approveNavBtn').classList.remove('hidden');
+      renderApprovals();
+    }
+  } catch (err) {
+    if (err.code === 'UNREGISTERED_LINE') {
+      $('statusSpinner').classList.add('hidden');
+      $('statusMsg').textContent = err.message;
+      $('myLineUid').value = err.line_user_id || '';
+      $('unregisteredBox').classList.remove('hidden');
+    } else showStatusError(err.message);
+  }
+}
+
+function copyLineUid() {
+  const el = $('myLineUid');
+  el.select();
+  if (navigator.clipboard) navigator.clipboard.writeText(el.value);
+  else document.execCommand('copy');
+  toast('คัดลอกรหัสแล้ว ส่งให้ผู้ดูแลระบบได้เลยครับ');
+}
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.bottom-nav button[data-tab]');
+  if (btn) switchTab(btn.dataset.tab);
+});
+
+function switchTab(tab) {
+  document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  ['leave', 'ot', 'attendance', 'history', 'approve'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== tab));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ================= Leave Form ================= */
+function bindForm() {
+  document.querySelectorAll('input[name="durationMode"], input[name="leaveType"], input[name="sickReasonType"]')
+    .forEach(r => r.addEventListener('change', updateLeaveForm));
+  $('leaveStart').addEventListener('change', () => {
+    if ($('leaveEnd').value < $('leaveStart').value || radioVal('durationMode') !== 'FULL_DAY') $('leaveEnd').value = $('leaveStart').value;
+    updateLeaveForm();
+  });
+  $('leaveEnd').addEventListener('change', updateLeaveForm);
+  $('leaveFile').addEventListener('change', onFileChange);
+  $('laterCertInput').addEventListener('change', onLaterCertSelected);
+
+  ['otStart', 'otEnd'].forEach(id => $(id).addEventListener('change', updateOtTotal));
+  document.querySelectorAll('input[name="histFilter"]').forEach(r => r.addEventListener('change', renderHistory));
+  updateOtTotal();
+}
+
+function updateLeaveForm() {
+  const type = radioVal('leaveType');
+  const mode = radioVal('durationMode');
+  const s = $('leaveStart').value;
+  const e = mode === 'FULL_DAY' ? $('leaveEnd').value : s;
+  const q = DATA.quotas || {};
+
+  $('leaveEndWrap').classList.toggle('hidden', mode !== 'FULL_DAY');
+  $('leaveHoursWrap').classList.toggle('hidden', mode !== 'HOURS');
+  $('leaveStartLabel').textContent = mode === 'FULL_DAY' ? 'ตั้งแต่วันที่' : 'วันที่ลา';
+  $('sickReasonWrap').classList.toggle('hidden', type !== 'ลาป่วย');
+  $('urgentWrap').classList.toggle('hidden', !(type === 'ลากิจ' && s === todayIso()));
+
+  // แสดงสิทธิ์วันลาคงเหลือตามประเภทที่เลือก
+  const banner = $('quotaBanner');
+  if (type === 'ลาป่วย') {
+    const noCertLeft = q.sickNoCertRemainingMonth !== undefined ? q.sickNoCertRemainingMonth : 1;
+    const warn = noCertLeft <= 0
+      ? '<br><b style="color:#b91c1c;">⚠️ เดือนนี้ใช้สิทธิ์ลาป่วยแบบไม่มีใบรับรองแพทย์ครบแล้ว กรุณาแนบใบรับรองแพทย์</b>'
+      : `<br>สิทธิ์ลาป่วยไม่มีใบรับรองแพทย์เดือนนี้คงเหลือ: <b>${noCertLeft}</b> วัน`;
+    banner.innerHTML = `สิทธิ์ลาป่วยปีนี้คงเหลือ: <b>${q.sickRemainingYear ?? 30}</b> / ${q.sickLimit ?? 30} วัน${warn}`;
+    banner.classList.remove('hidden');
+  } else if (type === 'ลากิจ') {
+    banner.innerHTML = `สิทธิ์ลากิจปีนี้คงเหลือ: <b>${q.personalRemaining ?? 3}</b> / ${q.personalLimit ?? 3} วัน<br><span class="hint">ลากิจบันทึกทันทีและแจ้งหัวหน้ารับทราบ</span>`;
+    banner.classList.remove('hidden');
+  } else if (type === 'ลาพักร้อน') {
+    banner.innerHTML = `🌴 ลาพักร้อนต้องรอหัวหน้างานอนุมัติก่อนนะครับ`;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+
+  let durText = mode === 'HOURS' ? `${LEAVE_HOURS} ชั่วโมง` : mode === 'HALF_DAY' ? 'ครึ่งวัน (4 ชม.)' : '';
+  if (mode === 'FULL_DAY' && s && e && e >= s) {
+    const days = Math.round((new Date(e) - new Date(s)) / 86400000) + 1;
+    durText = `${days} วัน${days > 1 ? ' (ระบบนับเฉพาะวันทำงาน)' : ''}`;
+  }
+  $('leaveSummary').innerHTML = s
+    ? `<b>${esc(type)}</b> • ${esc(durText)}<br>📅 ${esc(thaiDate(s))}${e && e !== s ? ' – ' + esc(thaiDate(e)) : ''}`
+    : '';
+}
+
+function stepHours(delta) {
+  LEAVE_HOURS = Math.min(7.5, Math.max(0.5, LEAVE_HOURS + delta));
+  $('leaveHoursVal').textContent = LEAVE_HOURS;
+  updateLeaveForm();
+}
+
+async function onFileChange() {
+  const f = $('leaveFile').files[0];
+  if (!f) return;
+  if (!/^image\//.test(f.type)) { toast('รองรับเฉพาะไฟล์รูปภาพครับ', true); clearFile(); return; }
+  try {
+    ATTACHMENT = await compressImage(f);
+    $('uploadImg').src = ATTACHMENT;
+    $('uploadEmpty').classList.add('hidden');
+    $('uploadPreview').classList.remove('hidden');
+  } catch (e) { toast('อ่านรูปไม่สำเร็จ ลองใหม่นะครับ', true); clearFile(); }
+}
+
+function clearFile(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  ATTACHMENT = '';
+  $('leaveFile').value = '';
+  $('uploadEmpty').classList.remove('hidden');
+  $('uploadPreview').classList.add('hidden');
+}
+
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1280;
+        let w = img.width, h = img.height;
+        if (w > max || h > max) {
+          if (w > h) { h = Math.round(h * max / w); w = max; } else { w = Math.round(w * max / h); h = max; }
+        }
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function submitLeave(e) {
+  e.preventDefault();
+  const mode = radioVal('durationMode');
+  const start = $('leaveStart').value;
+  const end = mode === 'FULL_DAY' ? $('leaveEnd').value : start;
+  if (end < start) { toast('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มลานะครับ', true); return; }
+
+  const btn = $('btnSubmitLeave');
+  btn.disabled = true; btn.textContent = 'กำลังส่งใบลา...';
+  try {
+    const res = await callApi('liff_submit_leave', {
+      leave_type: radioVal('leaveType'),
+      sick_reason_type: radioVal('sickReasonType'),
+      duration_mode: mode,
+      start_date: start,
+      end_date: end,
+      hours: LEAVE_HOURS,
+      urgent_reason: $('urgentReason').value.trim(),
+      reason: $('leaveReason').value.trim(),
+      attachment_base64: ATTACHMENT,
+      attachment_mime: 'image/jpeg'
+    });
+    $('leaveReason').value = '';
+    $('urgentReason').value = '';
+    clearFile();
+    await sheet({ html: '<div class="success-ico">✅</div>', title: 'ส่งเรียบร้อยแล้ว', body: res.message, confirmText: 'ดูประวัติ', hideCancel: true });
+    await loadData();
+    document.querySelector('input[name="histFilter"][value="leave"]').checked = true;
+    renderHistory();
+    switchTab('history');
+  } catch (err) { toast(err.message, true); }
+  finally { btn.disabled = false; btn.textContent = 'ส่งใบลา'; }
+}
+
+/* ================= Upload Medical Cert Later ================= */
+function triggerUploadLaterCert(requestId) {
+  LATER_CERT_REQ_ID = requestId;
+  $('laterCertInput').value = '';
+  $('laterCertInput').click();
+}
+
+async function onLaterCertSelected() {
+  const f = $('laterCertInput').files[0];
+  if (!f || !LATER_CERT_REQ_ID) return;
+  toast('กำลังอัปโหลดใบรับรองแพทย์...');
+  try {
+    const b64 = await compressImage(f);
+    const res = await callApi('liff_upload_med_cert', {
+      request_id: LATER_CERT_REQ_ID,
+      attachment_base64: b64,
+      attachment_mime: 'image/jpeg'
+    });
+    toast(res.message);
+    await loadData();
+  } catch (err) { toast(err.message, true); }
+}
+
+/* ================= OT Form ================= */
+function updateOtTotal() {
+  const s = $('otStart').value, e = $('otEnd').value;
+  if (!s || !e) return;
+  const [sh, sm] = s.split(':').map(Number), [eh, em] = e.split(':').map(Number);
+  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff <= 0) diff += 1440;
+  $('otTotal').innerHTML = `รวม <b>${esc(minsToText(diff))}</b>${e <= s ? ' <span class="hint">(ข้ามเที่ยงคืน)</span>' : ''}`;
+}
+
+function quickOt(hours) {
+  const s = $('otStart').value || '17:30';
+  const [h, m] = s.split(':').map(Number);
+  const total = (h * 60 + m + hours * 60) % 1440;
+  $('otEnd').value = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  updateOtTotal();
+}
+
+function renderJobSuggest() {
+  const jobs = [...new Set((DATA.ots || []).map(o => o.job_reference).filter(Boolean))].slice(0, 10);
+  $('jobSuggest').innerHTML = jobs.map(j => `<option value="${esc(j)}"></option>`).join('');
+}
+
+async function submitOT(e) {
+  e.preventDefault();
+  const btn = $('btnSubmitOt');
+  btn.disabled = true; btn.textContent = 'กำลังส่งคำขอ...';
+  try {
+    const res = await callApi('liff_submit_ot', {
+      ot_date: $('otDate').value,
+      start_time: $('otStart').value,
+      end_time: $('otEnd').value,
+      job_reference: $('otJob').value.trim(),
+      reason: $('otReason').value.trim()
+    });
+    $('otJob').value = '';
+    $('otReason').value = '';
+    await sheet({ html: '<div class="success-ico">✅</div>', title: 'ส่งเรียบร้อยแล้ว', body: res.message, confirmText: 'ดูประวัติ', hideCancel: true });
+    await loadData();
+    document.querySelector('input[name="histFilter"][value="ot"]').checked = true;
+    renderHistory();
+    switchTab('history');
+  } catch (err) { toast(err.message, true); }
+  finally { btn.disabled = false; btn.textContent = 'ส่งคำขอโอที'; }
+}
+
+/* ================= Missed Scan & My Attendance ================= */
+async function submitMissedScan(e) {
+  e.preventDefault();
+  const btn = $('btnSubmitMs');
+  btn.disabled = true; btn.textContent = 'กำลังส่ง...';
+  try {
+    const res = await callApi('liff_report_missed_scan', {
+      work_date: $('msDate').value,
+      scan_type: radioVal('msType'),
+      approx_time: $('msTime').value,
+      reason: $('msReason').value.trim()
+    });
+    $('msReason').value = '';
+    toast(res.message);
+    await loadData();
+  } catch (err) { toast(err.message, true); }
+  finally { btn.disabled = false; btn.textContent = 'แจ้งลืมสแกนนิ้ว'; }
+}
+
+function renderAttendance() {
+  const daily = (DATA.attendance && DATA.attendance.daily) || [];
+  $('myAttendanceList').innerHTML = daily.length ? daily.slice(0, 20).map(r => `
+    <div class="item">
+      <div class="item-ico" style="background:var(--brand-soft)">🕒</div>
+      <div class="item-body">
+        <div class="item-top"><div class="item-title">${esc(thaiDate(r.work_date))}</div><span class="pill pill-${r.flags ? 'PENDING' : 'APPROVED'}">${esc(r.status)}</span></div>
+        <div class="item-meta">เข้า: <b>${esc(r.first_in || '-')}</b> • ออก: <b>${esc(r.last_out || '-')}</b>${Number(r.late_min) > 0 ? ` • สาย ${r.late_min} น.` : ''}${Number(r.ot_paid_hours) > 0 ? ` • OT ${r.ot_paid_hours} ชม.` : ''}</div>
+      </div>
+    </div>`).join('') : '<div class="empty"><i>🕒</i>ยังไม่มีข้อมูลเวลาเข้า-ออกของเดือนนี้</div>';
+}
+
+/* ================= History ================= */
+const STATUS_TH = {
+  PENDING: 'รออนุมัติ',
+  APPROVED: 'อนุมัติแล้ว',
+  REJECTED: 'ไม่อนุมัติ',
+  RECORDED: 'บันทึกแล้ว',
+  ACKNOWLEDGED: 'รับทราบแล้ว',
+  WAITING_MEDICAL_CERT: 'รอใบรับรองแพทย์'
+};
+function statusClass(st) {
+  if (st === 'APPROVED' || st === 'ACKNOWLEDGED' || st === 'RECORDED') return 'APPROVED';
+  if (st === 'REJECTED') return 'REJECTED';
+  return 'PENDING';
+}
+function leaveDur(l) { return l.duration_mode === 'HOURS' ? `${l.hours} ชม.` : l.duration_mode === 'HALF_DAY' ? 'ครึ่งวัน' : `${l.days} วัน`; }
+
+function renderHistory() {
+  const f = radioVal('histFilter');
+  const list = f === 'ot' ? (DATA.ots || []) : (DATA.leaves || []);
+  if (!list.length) {
+    $('historyList').innerHTML = `<div class="empty"><i>${f === 'ot' ? '⏰' : '📝'}</i>ยังไม่มีประวัติ${f === 'ot' ? 'การขอโอที' : 'การลา'}</div>`;
+    return;
+  }
+  $('historyList').innerHTML = list.map(x => {
+    if (f === 'ot') {
+      return `<div class="item"><div class="item-ico" style="background:var(--green-soft)">⏰</div><div class="item-body">
+        <div class="item-top"><div class="item-title">โอที ${esc(x.requested_hours)} ชม.</div><span class="pill pill-${statusClass(x.status)}">${esc(STATUS_TH[x.status] || x.status)}</span></div>
+        <div class="item-meta">📅 ${esc(thaiDate(x.ot_date))} • ${esc(x.requested_start)}–${esc(x.requested_end)}<br>🔧 ${esc(x.job_reference || '-')}${x.reject_reason ? `<br>❗ ${esc(x.reject_reason)}` : ''}</div>
+      </div></div>`;
+    }
+    const dText = x.start_date === x.end_date ? thaiDate(x.start_date) : `${thaiDate(x.start_date)} – ${thaiDate(x.end_date)}`;
+    const needCertBtn = x.status === 'WAITING_MEDICAL_CERT'
+      ? `<div class="item-actions"><button class="btn btn-primary btn-sm" onclick="triggerUploadLaterCert('${esc(x.request_id)}')">📎 แนบใบรับรองแพทย์</button></div>`
+      : '';
+    return `<div class="item"><div class="item-ico" style="background:var(--brand-soft)">📝</div><div class="item-body">
+      <div class="item-top"><div class="item-title">${esc(x.leave_type)} ${esc(leaveDur(x))}</div><span class="pill pill-${statusClass(x.status)}">${esc(STATUS_TH[x.status] || x.status)}</span></div>
+      <div class="item-meta">📅 ${esc(dText)}<br>💬 ${esc(x.reason || '-')}${x.attachment_file_id ? '<br>📎 แนบเอกสารแล้ว' : ''}${x.reject_reason ? `<br>❗ ${esc(x.reject_reason)}` : ''}</div>
+      ${needCertBtn}
+    </div></div>`;
+  }).join('');
+}
+
+/* ================= Approvals & Acknowledge ================= */
+function renderApprovals() {
+  const vacs = DATA.pending_vacations || [];
+  const ots = DATA.pending_ots || [];
+  const unacks = DATA.unack_leaves || [];
+  const total = vacs.length + ots.length + unacks.length;
+  $('approveBadge').textContent = total;
+  $('approveBadge').classList.toggle('hidden', total === 0);
+
+  if (!total) {
+    $('approveList').innerHTML = '<div class="empty"><i>✨</i>ไม่มีรายการค้างอนุมัติหรือรับทราบครับ</div>';
+    return;
+  }
+
+  let html = '';
+  if (vacs.length) {
+    html += `<div class="group-label">🌴 ลาพักร้อนรออนุมัติ (${vacs.length})</div>` + vacs.map(l => `
+      <div class="item"><div class="item-ico" style="background:var(--brand-soft)">🌴</div><div class="item-body">
+        <div class="item-title">${esc(l.name)} • ลาพักร้อน ${esc(leaveDur(l))}</div>
+        <div class="item-meta">📅 ${esc(thaiDate(l.start_date))}<br>💬 ${esc(l.reason || '-')}</div>
+        <div class="item-actions">
+          <button class="btn btn-reject btn-sm" onclick="decideItem('LEAVE','${esc(l.request_id)}',false)">ไม่อนุมัติ</button>
+          <button class="btn btn-approve btn-sm" onclick="decideItem('LEAVE','${esc(l.request_id)}',true)">✓ อนุมัติ</button>
+        </div>
+      </div></div>`).join('');
+  }
+  if (ots.length) {
+    html += `<div class="group-label">⏰ โอทีรออนุมัติ (${ots.length})</div>` + ots.map(o => `
+      <div class="item"><div class="item-ico" style="background:var(--green-soft)">⏰</div><div class="item-body">
+        <div class="item-title">${esc(o.name)} • โอที ${esc(o.requested_hours)} ชม.</div>
+        <div class="item-meta">📅 ${esc(thaiDate(o.ot_date))} • ${esc(o.requested_start)}–${esc(o.requested_end)}<br>🔧 ${esc(o.job_reference || '-')}</div>
+        <div class="item-actions">
+          <button class="btn btn-reject btn-sm" onclick="decideItem('OT','${esc(o.request_id)}',false)">ไม่อนุมัติ</button>
+          <button class="btn btn-approve btn-sm" onclick="decideItem('OT','${esc(o.request_id)}',true)">✓ อนุมัติ</button>
+        </div>
+      </div></div>`).join('');
+  }
+  if (unacks.length) {
+    html += `<div class="group-label">📋 ลากิจ / ลาป่วย (แจ้งเพื่อทราบ ${unacks.length})</div>` + unacks.map(l => `
+      <div class="item"><div class="item-ico" style="background:var(--brand-soft)">📋</div><div class="item-body">
+        <div class="item-title">${esc(l.name)} • ${esc(l.leave_type)} ${esc(leaveDur(l))}</div>
+        <div class="item-meta">📅 ${esc(thaiDate(l.start_date))}<br>💬 ${esc(l.reason || '-')}${l.flags ? `<br>⚠️ ${esc(l.flags)}` : ''}</div>
+        <div class="item-actions">
+          <button class="btn btn-primary btn-sm" style="width:100%;" onclick="ackItem('${esc(l.request_id)}')">👍 รับทราบ</button>
+        </div>
+      </div></div>`).join('');
+  }
+  $('approveList').innerHTML = html;
+}
+
+async function decideItem(type, id, approved) {
+  let reason = '';
+  if (approved) {
+    const ok = await sheet({ title: 'ยืนยันการอนุมัติ', body: 'ระบบจะแจ้งผลให้พนักงานทราบทาง LINE ทันทีครับ', confirmText: '✓ อนุมัติ', confirmClass: 'btn-approve' });
+    if (!ok) return;
+  } else {
+    reason = await sheet({ title: 'ไม่อนุมัติรายการนี้', body: 'ระบุเหตุผลสั้นๆ เพื่อแจ้งพนักงาน (ไม่บังคับ)', input: true, confirmText: 'ยืนยันไม่อนุมัติ', confirmClass: 'btn-danger' });
+    if (reason === null) return;
+  }
+  try {
+    const res = await callApi('liff_decide', { target_type: type, target_id: id, approved, reject_reason: reason });
+    toast(res.message);
+    await loadData();
+  } catch (err) { toast(err.message, true); }
+}
+
+async function ackItem(requestId) {
+  try {
+    const res = await callApi('liff_acknowledge', { request_id: requestId });
+    toast(res.message);
+    await loadData();
+  } catch (err) { toast(err.message, true); }
+}

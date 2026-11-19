@@ -1,0 +1,18 @@
+# ห้ามอัปโหลดไฟล์ข้อมูลเงินเดือนและรูปภาพพนักงานขึ้น GitHub (PDPA)
+*.xlsx
+*.xls
+*.csv
+*.jpg
+*.jpeg
+*.png
+*.pdf
+
+# ไฟล์ตั้งค่าเฉพาะเครื่องและรหัสลับ
+apps_script/.clasp.json
+.env
+*.env
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+Thumbs.db
