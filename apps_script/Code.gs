@@ -117,6 +117,17 @@ function handleLiffAction(action, body) {
     return { status: 'ok', data: res, message: 'กดรับทราบเรียบร้อยแล้วครับ' };
   }
 
+  if (action === 'liff_decide_sick') {
+    if (!approver) throw new Error('บัญชีของคุณยังไม่มีสิทธิ์ดำเนินการนี้ครับ');
+    const allow = !!payload.allow_benefit;
+    const res = withScriptLock(() => decideSickLeaveBenefit(payload.request_id, allow, emp.employee_id, payload.note));
+    return {
+      status: 'ok',
+      data: res,
+      message: allow ? 'รับทราบการลาและอนุมัติใช้สิทธิ์เรียบร้อยครับ' : 'บันทึกการรับทราบและไม่อนุมัติการใช้สิทธิ์เรียบร้อยครับ'
+    };
+  }
+
   throw new Error('ไม่รู้จักคำสั่งที่ร้องขอ: ' + action);
 }
 
@@ -149,6 +160,11 @@ function adminDecideItem(adminSecret, targetType, requestId, isApproved, rejectR
 function adminAcknowledgeLeave(adminSecret, requestId) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => acknowledgeLeave(requestId, 'ADMIN'));
+}
+
+function adminDecideSickLeave(adminSecret, requestId, allowBenefit, note) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => decideSickLeaveBenefit(requestId, !!allowBenefit, 'ADMIN', note));
 }
 
 function adminGetIndividualTimesheet(adminSecret, employeeId, yearMonth) {

@@ -181,7 +181,8 @@ function ingestRawScans(rowsInput, source, actor) {
 function isEffectiveLeave(l) {
   const st = String(l.status).toUpperCase();
   if (l.leave_type === 'ลาพักร้อน') return st === 'APPROVED';
-  return st !== 'REJECTED';
+  if (st === 'REJECTED' || st === 'ACKNOWLEDGED_UNPAID') return false;
+  return true;
 }
 
 function computeDayMetrics(emp, dateStr, scanIn, scanOut, dayScansCount, dayLeaves, dayOTs, offDay, isFuture, settings, existingNote, existingManualStatus) {
@@ -474,7 +475,8 @@ function getMonthOverview(yearMonth) {
         WAITING_MEDICAL_CERT: 'รอใบรับรองแพทย์',
         SICK_LIMIT_EXCEEDED: 'ลาป่วยเกินโควตาปี',
         PERSONAL_LIMIT_EXCEEDED: 'ลากิจเกินโควตาปี',
-        LATE_NOTICE: 'แจ้งลาช้ากว่ากำหนด'
+        LATE_NOTICE: 'แจ้งลาช้ากว่ากำหนด',
+        CONSECUTIVE_LEAVE_3PLUS: 'ลาต่อเนื่องตั้งแต่ 3 วันขึ้นไป'
       };
       exceptions.push({
         kind: 'LEAVE',

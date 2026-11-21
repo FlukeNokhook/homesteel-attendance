@@ -212,14 +212,20 @@ function updateLeaveForm() {
   $('sickReasonWrap').classList.toggle('hidden', type !== 'ลาป่วย');
   $('urgentWrap').classList.toggle('hidden', !(type === 'ลากิจ' && s === todayIso()));
 
-  // แสดงสิทธิ์วันลาคงเหลือตามประเภทที่เลือก
+  // แสดงสิทธิ์วันลาและประวัติการป่วยของเดือนนี้อย่างชัดเจน
   const banner = $('quotaBanner');
   if (type === 'ลาป่วย') {
+    const noCertCount = q.sickNoCertCountMonth || 0;
+    const withCertCount = q.sickWithCertCountMonth || 0;
+    const totalMonthCount = q.sickCountMonth || 0;
     const noCertLeft = q.sickNoCertRemainingMonth !== undefined ? q.sickNoCertRemainingMonth : 1;
-    const warn = noCertLeft <= 0
-      ? '<br><b style="color:#b91c1c;">⚠️ เดือนนี้ใช้สิทธิ์ลาป่วยแบบไม่มีใบรับรองแพทย์ครบแล้ว กรุณาแนบใบรับรองแพทย์</b>'
-      : `<br>สิทธิ์ลาป่วยไม่มีใบรับรองแพทย์เดือนนี้คงเหลือ: <b>${noCertLeft}</b> วัน`;
-    banner.innerHTML = `สิทธิ์ลาป่วยปีนี้คงเหลือ: <b>${q.sickRemainingYear ?? 30}</b> / ${q.sickLimit ?? 30} วัน${warn}`;
+    const monthStatus = totalMonthCount > 0
+      ? `📊 เดือนนี้คุณลาป่วยไปแล้ว <b>${totalMonthCount} ครั้ง</b> (มีใบรับรองแพทย์ ${withCertCount} ครั้ง / ไม่มีใบรับรองแพทย์ ${noCertCount} ครั้ง)`
+      : `📊 เดือนนี้คุณยังไม่เคยลาป่วยครับ`;
+    const warn = (noCertCount >= 1 || noCertLeft <= 0)
+      ? `<div style="margin-top:6px; padding:8px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-weight:600;">⚠️ เดือนนี้ใช้สิทธิ์ลาป่วยแบบไม่มีใบรับรองแพทย์ครบแล้ว (1 ครั้ง/เดือน) กรุณาแนบใบรับรองแพทย์ครับ</div>`
+      : `<div style="margin-top:4px; color:#15803d;">✅ เดือนนี้ยังมีสิทธิ์ลาป่วยไม่มีใบรับรองแพทย์เหลือ <b>1 ครั้ง</b></div>`;
+    banner.innerHTML = `${monthStatus}<br>สิทธิ์ลาป่วยปีนี้คงเหลือ: <b>${q.sickRemainingYear ?? 30}</b> / ${q.sickLimit ?? 30} วัน${warn}`;
     banner.classList.remove('hidden');
   } else if (type === 'ลากิจ') {
     banner.innerHTML = `สิทธิ์ลากิจปีนี้คงเหลือ: <b>${q.personalRemaining ?? 3}</b> / ${q.personalLimit ?? 3} วัน<br><span class="hint">ลากิจบันทึกทันทีและแจ้งหัวหน้ารับทราบ</span>`;
@@ -231,7 +237,7 @@ function updateLeaveForm() {
     banner.classList.add('hidden');
   }
 
-  let durText = mode === 'HOURS' ? `${LEAVE_HOURS} ชั่วโมง` : mode === 'HALF_DAY' ? 'ครึ่งวัน (4 ชม.)' : '';
+  let durText = mode === 'HOURS' ? `${LEAVE_HOURS} ชั่วโมง` : '';
   if (mode === 'FULL_DAY' && s && e && e >= s) {
     const days = Math.round((new Date(e) - new Date(s)) / 86400000) + 1;
     durText = `${days} วัน${days > 1 ? ' (ระบบนับเฉพาะวันทำงาน)' : ''}`;
@@ -432,14 +438,16 @@ const STATUS_TH = {
   REJECTED: 'ไม่อนุมัติ',
   RECORDED: 'บันทึกแล้ว',
   ACKNOWLEDGED: 'รับทราบแล้ว',
+  ACKNOWLEDGED_PAID: 'รับทราบ • ใช้สิทธิ์ได้',
+  ACKNOWLEDGED_UNPAID: 'รับทราบ • ไม่อนุมัติใช้สิทธิ์',
   WAITING_MEDICAL_CERT: 'รอใบรับรองแพทย์'
 };
 function statusClass(st) {
-  if (st === 'APPROVED' || st === 'ACKNOWLEDGED' || st === 'RECORDED') return 'APPROVED';
-  if (st === 'REJECTED') return 'REJECTED';
+  if (st === 'APPROVED' || st === 'ACKNOWLEDGED' || st === 'ACKNOWLEDGED_PAID' || st === 'RECORDED') return 'APPROVED';
+  if (st === 'REJECTED' || st === 'ACKNOWLEDGED_UNPAID') return 'REJECTED';
   return 'PENDING';
 }
-function leaveDur(l) { return l.duration_mode === 'HOURS' ? `${l.hours} ชม.` : l.duration_mode === 'HALF_DAY' ? 'ครึ่งวัน' : `${l.days} วัน`; }
+function leaveDur(l) { return l.duration_mode === 'HOURS' ? `${l.hours} ชม.` : `${l.days} วัน`; }
 
 function renderHistory() {
   const f = radioVal('histFilter');
@@ -487,6 +495,7 @@ function renderApprovals() {
       <div class="item"><div class="item-ico" style="background:var(--brand-soft)">🌴</div><div class="item-body">
         <div class="item-title">${esc(l.name)} • ลาพักร้อน ${esc(leaveDur(l))}</div>
         <div class="item-meta">📅 ${esc(thaiDate(l.start_date))}<br>💬 ${esc(l.reason || '-')}</div>
+        ${l.consecutive_alert ? `<div style="margin-top:6px; padding:7px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-size:12.5px; font-weight:600;">🚨 ${esc(l.consecutive_alert)}</div>` : ''}
         <div class="item-actions">
           <button class="btn btn-reject btn-sm" onclick="decideItem('LEAVE','${esc(l.request_id)}',false)">ไม่อนุมัติ</button>
           <button class="btn btn-approve btn-sm" onclick="decideItem('LEAVE','${esc(l.request_id)}',true)">✓ อนุมัติ</button>
@@ -505,14 +514,38 @@ function renderApprovals() {
       </div></div>`).join('');
   }
   if (unacks.length) {
-    html += `<div class="group-label">📋 ลากิจ / ลาป่วย (แจ้งเพื่อทราบ ${unacks.length})</div>` + unacks.map(l => `
-      <div class="item"><div class="item-ico" style="background:var(--brand-soft)">📋</div><div class="item-body">
+    html += `<div class="group-label">📋 ลากิจ / ลาป่วย (แจ้งเพื่อทราบ ${unacks.length})</div>` + unacks.map(l => {
+      let sickBox = '';
+      if (l.leave_type === 'ลาป่วย' && l.sick_info) {
+        const si = l.sick_info;
+        const seqBanner = l.sub_type === 'SICK_NO_CERT'
+          ? (si.noCertSeq <= 1
+            ? `<div style="color:#1e40af; font-weight:700;">ℹ️ ลาป่วยไม่มีใบรับรองแพทย์ (ครั้งที่ 1 ของเดือนนี้)</div>`
+            : `<div style="color:#b91c1c; font-weight:700;">⚠️ ลาป่วยไม่มีใบรับรองแพทย์ (ครั้งที่ ${si.noCertSeq} ของเดือนนี้ — เกินสิทธิ์ 1 ครั้ง/เดือน)</div>`)
+          : `<div style="color:#15803d; font-weight:700;">📎 ลาป่วยมีใบรับรองแพทย์</div>`;
+        sickBox = `<div style="margin-top:8px; padding:9px 10px; border-radius:10px; background:#eff6ff; font-size:12.5px; line-height:1.5;">
+          ${seqBanner}
+          <div>📊 เดือนนี้ป่วยรวม <b>${si.monthTotalCount} ครั้ง</b> (มีใบรับรองฯ ${si.monthWithCertCount} / ไม่มี ${si.monthNoCertCount})</div>
+          <div>สิทธิ์ปีนี้คงเหลือ <b>${si.yearRemainingDays}/${si.yearLimit} วัน</b></div>
+        </div>`;
+      }
+      const consecBox = l.consecutive_alert
+        ? `<div style="margin-top:6px; padding:7px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-size:12.5px; font-weight:600;">🚨 ${esc(l.consecutive_alert)}</div>`
+        : '';
+      const actionHtml = l.leave_type === 'ลาป่วย'
+        ? `<div class="item-actions" style="flex-direction:column;">
+            <button class="btn btn-approve btn-sm" style="width:100%;" onclick="decideSickItem('${esc(l.request_id)}',true)">✅ รับทราบการลา และ อนุมัติใช้สิทธิ์ได้</button>
+            <button class="btn btn-reject btn-sm" style="width:100%;" onclick="decideSickItem('${esc(l.request_id)}',false)">⚠️ รับทราบการลา และ ไม่อนุมัติการใช้สิทธิ์</button>
+          </div>`
+        : `<div class="item-actions">
+            <button class="btn btn-primary btn-sm" style="width:100%;" onclick="ackItem('${esc(l.request_id)}')">👍 รับทราบ</button>
+          </div>`;
+      return `<div class="item"><div class="item-ico" style="background:var(--brand-soft)">${l.leave_type === 'ลาป่วย' ? '🤒' : '📋'}</div><div class="item-body">
         <div class="item-title">${esc(l.name)} • ${esc(l.leave_type)} ${esc(leaveDur(l))}</div>
-        <div class="item-meta">📅 ${esc(thaiDate(l.start_date))}<br>💬 ${esc(l.reason || '-')}${l.flags ? `<br>⚠️ ${esc(l.flags)}` : ''}</div>
-        <div class="item-actions">
-          <button class="btn btn-primary btn-sm" style="width:100%;" onclick="ackItem('${esc(l.request_id)}')">👍 รับทราบ</button>
-        </div>
-      </div></div>`).join('');
+        <div class="item-meta">📅 ${esc(thaiDate(l.start_date))}<br>💬 ${esc(l.reason || '-')}</div>
+        ${sickBox}${consecBox}${actionHtml}
+      </div></div>`;
+    }).join('');
   }
   $('approveList').innerHTML = html;
 }
@@ -536,6 +569,34 @@ async function decideItem(type, id, approved) {
 async function ackItem(requestId) {
   try {
     const res = await callApi('liff_acknowledge', { request_id: requestId });
+    toast(res.message);
+    await loadData();
+  } catch (err) { toast(err.message, true); }
+}
+
+async function decideSickItem(requestId, allowBenefit) {
+  let note = '';
+  if (allowBenefit) {
+    const ok = await sheet({
+      title: 'รับทราบและอนุมัติใช้สิทธิ์ลาป่วย',
+      body: 'ระบบจะแจ้งพนักงานทาง LINE ว่าได้รับทราบและอนุมัติใช้สิทธิ์ลาป่วยได้ครับ',
+      confirmText: '✅ ยืนยัน',
+      confirmClass: 'btn-approve'
+    });
+    if (!ok) return;
+  } else {
+    note = await sheet({
+      title: 'รับทราบแต่ไม่อนุมัติการใช้สิทธิ์',
+      body: 'ระบุหมายเหตุสั้นๆ เพื่อแจ้งพนักงาน (เช่น ใช้สิทธิ์ไม่มีใบรับรองแพทย์ครบเดือนแล้ว)',
+      input: true,
+      placeholder: 'เช่น เกินสิทธิ์ลาป่วยแบบไม่มีใบรับรองแพทย์',
+      confirmText: '⚠️ ยืนยัน',
+      confirmClass: 'btn-danger'
+    });
+    if (note === null) return;
+  }
+  try {
+    const res = await callApi('liff_decide_sick', { request_id: requestId, allow_benefit: allowBenefit, note: note });
     toast(res.message);
     await loadData();
   } catch (err) { toast(err.message, true); }

@@ -567,18 +567,41 @@
 
     function leaveCard(l, mode) {
       const icon = l.leave_type === 'ลาป่วย' ? '🤒' : l.leave_type === 'ลาพักร้อน' ? '🌴' : '💼';
-      const dur = l.duration_mode === 'HOURS' ? `${l.hours} ชม.` : l.duration_mode === 'HALF_DAY' ? 'ครึ่งวัน' : `${l.days} วัน`;
+      const dur = l.duration_mode === 'HOURS' ? `${l.hours} ชม.` : `${l.days} วัน`;
       const dText = l.start_date === l.end_date ? shortDate(l.start_date) : `${shortDate(l.start_date)} – ${shortDate(l.end_date)}`;
+      let extraHtml = '';
+      if (l.sick_info) {
+        const si = l.sick_info;
+        const seqTxt = l.sub_type === 'SICK_NO_CERT'
+          ? (si.noCertSeq <= 1 ? 'ℹ️ ลาป่วยไม่มีใบรับรองแพทย์ (ครั้งที่ 1 ของเดือนนี้)' : `⚠️ ลาป่วยไม่มีใบรับรองแพทย์ (ครั้งที่ ${si.noCertSeq} ของเดือนนี้ — เกินสิทธิ์)`)
+          : '📎 ลาป่วยมีใบรับรองแพทย์';
+        extraHtml += `<div style="margin-top:6px; font-size:12.5px; color:#1e3a8a; background:#eff6ff; padding:6px 10px; border-radius:8px;">
+          <b>${esc(seqTxt)}</b><br>เดือนนี้ป่วยรวม ${si.monthTotalCount} ครั้ง (มีใบรับรองฯ ${si.monthWithCertCount} / ไม่มี ${si.monthNoCertCount}) • ปีนี้เหลือ ${si.yearRemainingDays}/${si.yearLimit} วัน
+        </div>`;
+      }
+      if (l.consecutive_alert) {
+        extraHtml += `<div style="margin-top:6px; font-size:12.5px; color:#991b1b; background:#fee2e2; padding:6px 10px; border-radius:8px;">🚨 ${esc(l.consecutive_alert)}</div>`;
+      }
+      let actionBtns = '';
+      if (mode === 'DECIDE') {
+        actionBtns = `<button class="btn btn-soft-red btn-sm" onclick="decide('LEAVE','${esc(l.request_id)}',false)">ไม่อนุมัติ</button><button class="btn btn-success btn-sm" onclick="decide('LEAVE','${esc(l.request_id)}',true)">✓ อนุมัติ</button>`;
+      } else if (mode === 'ACK') {
+        if (l.leave_type === 'ลาป่วย') {
+          actionBtns = `<button class="btn btn-soft-red btn-sm" onclick="decideSick('${esc(l.request_id)}',false)">รับทราบ (ไม่อนุมัติใช้สิทธิ์)</button><button class="btn btn-success btn-sm" onclick="decideSick('${esc(l.request_id)}',true)">✓ รับทราบ (อนุมัติใช้สิทธิ์ได้)</button>`;
+        } else {
+          actionBtns = `<button class="btn btn-soft-blue btn-sm" onclick="ackLeave('${esc(l.request_id)}')">👍 รับทราบ</button>`;
+        }
+      }
       return `<div class="req">
         <div class="req-ico" style="background:var(--brand-soft)">${icon}</div>
         <div>
           <div class="req-title">${esc(l.name)} • ${esc(l.leave_type)} ${esc(dur)} <span class="pill pill-gray">${esc(l.status)}</span></div>
           <div class="req-meta"><span>📅 ${esc(dText)}</span><span>💬 ${esc(l.reason || '-')}</span>${l.flags ? `<span style="color:var(--amber);">⚠️ ${esc(l.flags)}</span>` : ''}</div>
+          ${extraHtml}
         </div>
         <div class="req-actions">
           ${l.attachment_file_id ? `<button class="btn btn-ghost btn-sm" onclick="viewAttachment('${esc(l.attachment_file_id)}')">📎 ดูรูป</button>` : ''}
-          ${mode === 'DECIDE' ? `<button class="btn btn-soft-red btn-sm" onclick="decide('LEAVE','${esc(l.request_id)}',false)">ไม่อนุมัติ</button><button class="btn btn-success btn-sm" onclick="decide('LEAVE','${esc(l.request_id)}',true)">✓ อนุมัติ</button>` : ''}
-          ${mode === 'ACK' ? `<button class="btn btn-soft-blue btn-sm" onclick="ackLeave('${esc(l.request_id)}')">👍 รับทราบ</button>` : ''}
+          ${actionBtns}
         </div>
       </div>`;
     }
@@ -619,6 +642,16 @@
 
     async function ackLeave(id) {
       try { await call('adminAcknowledgeLeave', id); toast('กดรับทราบเรียบร้อยแล้ว', 'success'); loadInit(); }
+      catch (err) { toast(err.message, 'error'); }
+    }
+
+    async function decideSick(id, allowBenefit) {
+      let note = '';
+      if (!allowBenefit) {
+        note = await modal({ title: 'รับทราบการลา (ไม่อนุมัติการใช้สิทธิ์)', body: 'ระบุหมายเหตุสั้นๆ เพื่อแจ้งพนักงานทาง LINE (เช่น เกินสิทธิ์ไม่มีใบรับรองแพทย์)', input: true, confirmText: 'ยืนยัน (ไม่อนุมัติใช้สิทธิ์)', confirmClass: 'btn-danger' });
+        if (note === null) return;
+      }
+      try { await call('adminDecideSickLeave', id, allowBenefit, note); toast('บันทึกผลการพิจารณาใบลาป่วยเรียบร้อย', 'success'); loadInit(); }
       catch (err) { toast(err.message, 'error'); }
     }
 
