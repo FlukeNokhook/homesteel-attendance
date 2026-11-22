@@ -163,7 +163,7 @@ function repoCacheGet(key, ttlSec, loader) {
 
 function repoClearCache() {
   try {
-    CacheService.getScriptCache().removeAll(['cache_settings', 'cache_employees', 'cache_holidays']);
+    CacheService.getScriptCache().removeAll(['cache_settings', 'cache_employees', 'cache_holidays', 'cache_holidays_map']);
   } catch (_) {}
 }
 
@@ -190,11 +190,19 @@ function repoGetEmployees() {
   });
 }
 
-function repoGetHolidaySet() {
-  const arr = repoCacheGet('cache_holidays', 300, function () {
-    return repoReadAll(SHEETS.HOLIDAYS).rows.map(h => String(h.holiday_date).trim()).filter(Boolean);
+function repoGetHolidayMap() {
+  return repoCacheGet('cache_holidays_map', 300, function () {
+    const map = {};
+    repoReadAll(SHEETS.HOLIDAYS).rows.forEach(h => {
+      const d = String(h.holiday_date || '').trim();
+      if (d) map[d] = String(h.holiday_name || 'วันหยุดนักขัตฤกษ์').trim();
+    });
+    return map;
   });
-  return new Set(arr);
+}
+
+function repoGetHolidaySet() {
+  return new Set(Object.keys(repoGetHolidayMap()));
 }
 
 /* ================= Domain Helpers ================= */

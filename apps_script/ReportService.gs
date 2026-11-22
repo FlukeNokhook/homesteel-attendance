@@ -236,9 +236,14 @@ function computeDayMetrics(emp, dateStr, scanIn, scanOut, dayScansCount, dayLeav
     }
 
     dayOTs.forEach(o => {
+      const reqMin = Math.round(Number(o.approved_hours || o.requested_hours || 0) * 60);
+      if (String(o.actual_start || '') === 'OFFSITE_OVERRIDE') {
+        otActualMin += reqMin;
+        otPaidHours += reqMin / 60;
+        return;
+      }
       const w = otWindow(o.approved_start || o.requested_start, o.approved_end || o.requested_end);
       if (!w) return;
-      const reqMin = Math.round(Number(o.approved_hours || o.requested_hours || 0) * 60);
       const overlap = Math.max(0, Math.min(outMin, w.end) - Math.max(inMin, w.start));
       const paidMin = Math.min(reqMin, overlap);
       otActualMin += overlap;
@@ -249,9 +254,15 @@ function computeDayMetrics(emp, dateStr, scanIn, scanOut, dayScansCount, dayLeav
     if (!offDay && !isFuture && !scanIn && !scanOut) {
       absentMin = Math.max(0, workHoursMin - leaveMin);
     }
-    if (dayOTs.length > 0 && !isFuture) {
-      flags.push('OT_NO_SCAN');
-    }
+    dayOTs.forEach(o => {
+      const reqMin = Math.round(Number(o.approved_hours || o.requested_hours || 0) * 60);
+      if (String(o.actual_start || '') === 'OFFSITE_OVERRIDE') {
+        otActualMin += reqMin;
+        otPaidHours += reqMin / 60;
+      } else if (!isFuture) {
+        flags.push('OT_NO_SCAN');
+      }
+    });
   }
 
   const status = existingManualStatus === 'CORRECTED'
@@ -362,6 +373,20 @@ function recomputeDailyForMonth(yearMonth) {
   repoWriteRowsAt(sheet, 2, keep.concat(newRows));
 
   return { rowsGenerated: newRows.length };
+}
+
+/**
+ * เรียกคำนวณรายวันอัตโนมัติหลังอนุมัติ/รับทราบ โดยไม่ทำให้การอนุมัติล้มเหลวหากงวดถูกล็อก
+ */
+function safeAutoRecompute(dateStr) {
+  try {
+    const ym = String(dateStr || '').slice(0, 7);
+    if (/^\d{4}-\d{2}$/.test(ym)) {
+      recomputeDailyForMonth(ym);
+    }
+  } catch (e) {
+    Logger.log('safeAutoRecompute skip: ' + e.message);
+  }
 }
 
 /**
@@ -526,11 +551,15 @@ function getIndividualTimesheet(employeeId, yearMonth) {
   const emp = repoFindEmployeeById(employeeId);
   if (!emp) throw new Error('ไม่พบข้อมูลพนักงานครับ');
 
-  const holidaySet = repoGetHolidaySet();
+  const holidayMap = repoGetHolidayMap();
+  const holidaySet = new Set(Object.keys(holidayMap));
   const daily = repoReadAll(SHEETS.ATTENDANCE_DAILY).rows
     .filter(r => String(r.employee_id) === String(emp.employee_id) && String(r.work_date).indexOf(yearMonth) === 0)
     .sort((a, b) => String(a.work_date).localeCompare(String(b.work_date)))
-    .map(r => Object.assign({}, r, { is_off_day: isOffDay(String(r.work_date), holidaySet) }));
+    .map(r => Object.assign({}, r, {
+      is_off_day: isOffDay(String(r.work_date), holidaySet),
+      holiday_name: holidayMap[String(r.work_date)] || ''
+    }));
 
   const leaves = repoReadAll(SHEETS.LEAVE).rows.filter(l =>
     String(l.employee_id) === String(emp.employee_id) &&

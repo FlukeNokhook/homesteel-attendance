@@ -503,15 +503,21 @@ function renderApprovals() {
       </div></div>`).join('');
   }
   if (ots.length) {
-    html += `<div class="group-label">⏰ โอทีรออนุมัติ (${ots.length})</div>` + ots.map(o => `
-      <div class="item"><div class="item-ico" style="background:var(--green-soft)">⏰</div><div class="item-body">
+    html += `<div class="group-label">⏰ โอทีรออนุมัติ (${ots.length})</div>` + ots.map(o => {
+      const hasScan = o.actual_first_in || o.actual_last_out;
+      const scanBox = `<div style="margin-top:6px; padding:6px 9px; border-radius:8px; font-size:12.5px; background:${hasScan ? '#eff6ff' : '#fef3c7'}; color:${hasScan ? '#1e3a8a' : '#92400e'};">
+        ${hasScan ? `🕒 สแกนจริง: เข้า <b>${esc(o.actual_first_in || '-')}</b> • ออก <b>${esc(o.actual_last_out || '-')}</b>` : '🕒 ยังไม่มีข้อมูลสแกนนิ้วของวันนี้'}
+      </div>`;
+      return `<div class="item"><div class="item-ico" style="background:var(--green-soft)">⏰</div><div class="item-body">
         <div class="item-title">${esc(o.name)} • โอที ${esc(o.requested_hours)} ชม.</div>
         <div class="item-meta">📅 ${esc(thaiDate(o.ot_date))} • ${esc(o.requested_start)}–${esc(o.requested_end)}<br>🔧 ${esc(o.job_reference || '-')}</div>
+        ${scanBox}
         <div class="item-actions">
           <button class="btn btn-reject btn-sm" onclick="decideItem('OT','${esc(o.request_id)}',false)">ไม่อนุมัติ</button>
-          <button class="btn btn-approve btn-sm" onclick="decideItem('OT','${esc(o.request_id)}',true)">✓ อนุมัติ</button>
+          <button class="btn btn-approve btn-sm" onclick="openApproveOtSheet('${esc(o.request_id)}','${esc(o.name)}','${esc(o.ot_date)}','${esc(o.requested_start)}','${esc(o.requested_end)}','${esc(o.actual_first_in || '')}','${esc(o.actual_last_out || '')}')">✓ อนุมัติ / แก้เวลา</button>
         </div>
-      </div></div>`).join('');
+      </div></div>`;
+    }).join('');
   }
   if (unacks.length) {
     html += `<div class="group-label">📋 ลากิจ / ลาป่วย (แจ้งเพื่อทราบ ${unacks.length})</div>` + unacks.map(l => {
@@ -572,6 +578,52 @@ async function ackItem(requestId) {
     toast(res.message);
     await loadData();
   } catch (err) { toast(err.message, true); }
+}
+
+function openApproveOtSheet(id, name, otDate, reqStart, reqEnd, scanIn, scanOut) {
+  const scanInfo = (scanIn || scanOut)
+    ? `🕒 สแกนจริง: เข้า <b>${esc(scanIn || '-')}</b> • ออก <b>${esc(scanOut || '-')}</b>`
+    : '🕒 ยังไม่มีข้อมูลสแกนนิ้วของวันนี้';
+  const root = $('sheetRoot');
+  root.innerHTML = `<div class="sheet-bg"><div class="sheet">
+    <div class="grab"></div>
+    <h3>อนุมัติโอที • ${esc(name)}</h3>
+    <p>วันที่ ${esc(thaiDate(otDate))} (ปรับเวลาที่อนุมัติได้ก่อนยืนยัน)</p>
+    <div class="summary" style="background:#eff6ff; color:#1e3a8a; margin-bottom:12px;">${scanInfo}</div>
+    <div class="row-2">
+      <div class="field"><label class="label">เริ่ม OT</label><input id="liffOtStart" type="time" class="input" value="${esc(reqStart)}" /></div>
+      <div class="field"><label class="label">สิ้นสุด OT</label><input id="liffOtEnd" type="time" class="input" value="${esc(reqEnd)}" /></div>
+    </div>
+    <label style="display:flex; gap:8px; align-items:flex-start; font-size:13.5px; margin-bottom:8px; cursor:pointer;">
+      <input type="checkbox" id="liffOtOffsite" style="margin-top:3px; width:18px; height:18px;" />
+      <span><b>จ่าย OT เต็มตามที่อนุมัติ (ไม่เทียบสแกนนิ้ว)</b><br><span class="hint">สำหรับงานนอกสถานที่ / ขับรถส่งของหลังสแกนออก</span></span>
+    </label>
+    <div class="sheet-actions">
+      <button class="btn btn-ghost" id="liffOtCancel">ยกเลิก</button>
+      <button class="btn btn-approve" id="liffOtOk">✓ ยืนยันอนุมัติ</button>
+    </div>
+  </div></div>`;
+  $('liffOtCancel').onclick = () => { root.innerHTML = ''; };
+  $('liffOtOk').onclick = async () => {
+    const btn = $('liffOtOk');
+    btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+    try {
+      const res = await callApi('liff_decide', {
+        target_type: 'OT',
+        target_id: id,
+        approved: true,
+        approved_start: $('liffOtStart').value,
+        approved_end: $('liffOtEnd').value,
+        skip_scan_cap: $('liffOtOffsite').checked
+      });
+      root.innerHTML = '';
+      toast(res.message);
+      await loadData();
+    } catch (err) {
+      toast(err.message, true);
+      btn.disabled = false; btn.textContent = '✓ ยืนยันอนุมัติ';
+    }
+  };
 }
 
 async function decideSickItem(requestId, allowBenefit) {

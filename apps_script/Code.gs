@@ -105,8 +105,13 @@ function handleLiffAction(action, body) {
   if (action === 'liff_decide') {
     if (!approver) throw new Error('บัญชีของคุณยังไม่มีสิทธิ์อนุมัติรายการนี้ครับ');
     const approved = !!payload.approved;
+    const otOpts = {
+      approved_start: payload.approved_start,
+      approved_end: payload.approved_end,
+      skip_scan_cap: !!payload.skip_scan_cap
+    };
     const res = withScriptLock(() => (payload.target_type === 'OT'
-      ? decideOT(payload.target_id, approved, emp.employee_id, payload.reject_reason)
+      ? decideOT(payload.target_id, approved, emp.employee_id, payload.reject_reason, otOpts)
       : decideVacationLeave(payload.target_id, approved, emp.employee_id, payload.reject_reason)));
     return { status: 'ok', data: res, message: approved ? 'อนุมัติเรียบร้อยแล้วครับ' : 'บันทึกการไม่อนุมัติเรียบร้อยแล้วครับ' };
   }
@@ -150,10 +155,10 @@ function adminGetInitData(adminSecret, yearMonth) {
   };
 }
 
-function adminDecideItem(adminSecret, targetType, requestId, isApproved, rejectReason) {
+function adminDecideItem(adminSecret, targetType, requestId, isApproved, rejectReason, otOptions) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => (targetType === 'OT'
-    ? decideOT(requestId, isApproved, 'ADMIN', rejectReason)
+    ? decideOT(requestId, isApproved, 'ADMIN', rejectReason, otOptions)
     : decideVacationLeave(requestId, isApproved, 'ADMIN', rejectReason)));
 }
 

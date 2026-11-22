@@ -425,6 +425,7 @@ function decideVacationLeave(requestId, isApproved, actorId, rejectReason) {
     { status: target.status }, updates, updates.reject_reason);
 
   notifyEmployeeDecision(target.employee_id, target.leave_type, target.start_date, isApproved, updates.reject_reason);
+  safeAutoRecompute(target.start_date);
   return Object.assign({}, target, updates);
 }
 
@@ -454,6 +455,7 @@ function decideSickLeaveBenefit(requestId, allowBenefit, actorId, note) {
     { status: target.status }, updates, updates.reject_reason);
 
   notifyEmployeeSickDecision(target.employee_id, target.start_date, allowBenefit, updates.reject_reason);
+  safeAutoRecompute(target.start_date);
   return Object.assign({}, target, updates);
 }
 
@@ -475,5 +477,6 @@ function acknowledgeLeave(requestId, actorId) {
     { status: target.status }, updates, 'รับทราบใบลา');
 
   notifyEmployeeAcknowledged(target.employee_id, target.leave_type, target.start_date);
+  safeAutoRecompute(target.start_date);
   return Object.assign({}, target, updates);
 }

@@ -75,14 +75,19 @@ function notifyApproverNewLeave(rec, extra) {
   repoGetApprovers(rec.employee_id).forEach(a => sendLinePush(a.line_user_id, msg));
 }
 
-function notifyApproverNewOT(rec) {
+function notifyApproverNewOT(rec, actualScan) {
   const cfg = getAppConfig();
+  const scan = actualScan || {};
+  const scanLine = (scan.first_in || scan.last_out)
+    ? '🕒 สแกนจริงวันนี้: เข้า ' + (scan.first_in || '-') + ' • ออก ' + (scan.last_out || '-')
+    : '🕒 ยังไม่มีข้อมูลสแกนนิ้วของวันนี้ในระบบ';
   const msg = [
     '⏰ มีคำขอทำโอทีรออนุมัติครับ',
     '',
     '👤 ' + rec.name,
     '📅 ' + rec.ot_date + ' • ' + rec.requested_start + '-' + rec.requested_end + ' (' + rec.requested_hours + ' ชม.)',
     '🔧 งาน: ' + (rec.job_reference || '-'),
+    scanLine,
     rec.reason ? '💬 ' + rec.reason : '',
     cfg.LIFF_URL ? '\nกดอนุมัติได้ที่ 👉 ' + cfg.LIFF_URL + '?tab=approve' : ''
   ].filter(Boolean).join('\n');

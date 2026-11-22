@@ -525,7 +525,7 @@
             <td class="num">${hm(r.late_min)}</td>
             <td class="num">${num(r.leave_hours)}</td>
             <td class="num"><b>${num(r.ot_paid_hours)}</b></td>
-            <td class="note">${esc(r.admin_note || r.flags || '')}</td>
+            <td class="note">${r.holiday_name ? `<span class="pill pill-violet" style="margin-right:4px;">🎉 ${esc(r.holiday_name)}</span>` : ''}${esc(r.admin_note || r.flags || '')}</td>
             <td><button class="btn btn-ghost btn-sm" onclick="openCorrectModal('${esc(r.work_date)}','${esc(r.employee_id)}','${esc(e.name)}','${esc(r.first_in)}','${esc(r.last_out)}','${esc(r.admin_note)}')">✏️ แก้ไข</button></td>
           </tr>`;
         }).join('')}</tbody></table></div>` : emptyState('📭', 'ยังไม่มีข้อมูลรายวันของเดือนนี้');
@@ -607,16 +607,63 @@
     }
 
     function otCard(o, canDecide) {
+      const hasScan = o.actual_first_in || o.actual_last_out;
+      const scanHtml = canDecide
+        ? `<div style="margin-top:6px; font-size:12.5px; color:${hasScan ? '#1e3a8a' : '#92400e'}; background:${hasScan ? '#eff6ff' : '#fef3c7'}; padding:5px 9px; border-radius:8px; display:inline-block;">
+            ${hasScan ? `🕒 สแกนจริงวันนี้: เข้า <b>${esc(o.actual_first_in || '-')}</b> • ออก <b>${esc(o.actual_last_out || '-')}</b>` : '🕒 ยังไม่มีข้อมูลสแกนนิ้วของวันนี้ในระบบ'}
+          </div>`
+        : '';
+      const timeRange = (o.approved_start && o.approved_end) ? `${o.approved_start}–${o.approved_end}` : `${o.requested_start}–${o.requested_end}`;
+      const hrsText = o.approved_hours ? `${o.approved_hours}` : `${o.requested_hours}`;
       return `<div class="req">
         <div class="req-ico" style="background:var(--green-soft)">⏰</div>
         <div>
-          <div class="req-title">${esc(o.name)} • โอที ${esc(o.requested_hours)} ชม. <span class="pill pill-gray">${esc(o.status)}</span></div>
-          <div class="req-meta"><span>📅 ${esc(shortDate(o.ot_date))} • ${esc(o.requested_start)}–${esc(o.requested_end)}</span><span>🔧 ${esc(o.job_reference || '-')}</span></div>
+          <div class="req-title">${esc(o.name)} • โอที ${esc(hrsText)} ชม. <span class="pill pill-gray">${esc(o.status)}</span>${o.actual_start === 'OFFSITE_OVERRIDE' ? ' <span class="pill pill-blue">งานนอกสถานที่</span>' : ''}</div>
+          <div class="req-meta"><span>📅 ${esc(shortDate(o.ot_date))} • ${esc(timeRange)}</span><span>🔧 ${esc(o.job_reference || '-')}</span></div>
+          ${scanHtml}
         </div>
         <div class="req-actions">
-          ${canDecide ? `<button class="btn btn-soft-red btn-sm" onclick="decide('OT','${esc(o.request_id)}',false)">ไม่อนุมัติ</button><button class="btn btn-success btn-sm" onclick="decide('OT','${esc(o.request_id)}',true)">✓ อนุมัติ</button>` : ''}
+          ${canDecide ? `<button class="btn btn-soft-red btn-sm" onclick="decide('OT','${esc(o.request_id)}',false)">ไม่อนุมัติ</button><button class="btn btn-success btn-sm" onclick="openApproveOtModal('${esc(o.request_id)}','${esc(o.name)}','${esc(o.ot_date)}','${esc(o.requested_start)}','${esc(o.requested_end)}','${esc(o.actual_first_in || '')}','${esc(o.actual_last_out || '')}')">✓ อนุมัติ / แก้เวลา</button>` : ''}
         </div>
       </div>`;
+    }
+
+    function openApproveOtModal(id, name, otDate, reqStart, reqEnd, scanIn, scanOut) {
+      const scanInfo = (scanIn || scanOut)
+        ? `🕒 สแกนจริงวันนี้: เข้า <b>${esc(scanIn || '-')}</b> • ออก <b>${esc(scanOut || '-')}</b>`
+        : '🕒 ยังไม่มีข้อมูลสแกนนิ้วของวันนี้ในระบบ';
+      const root = $('modalRoot');
+      root.innerHTML = `<div class="modal-bg"><div class="modal">
+        <h3>อนุมัติโอที • ${esc(name)}</h3>
+        <p>วันที่ ${esc(shortDate(otDate))} (แก้ไขเวลาที่อนุมัติได้ก่อนกดยืนยัน)</p>
+        <div class="callout" style="margin-bottom:12px;"><span>ℹ️</span><div>${scanInfo}</div></div>
+        <div class="grid-2">
+          <div><label class="card-sub">เวลาเริ่ม OT</label><input id="otAppStart" type="time" class="input" value="${esc(reqStart)}" /></div>
+          <div><label class="card-sub">เวลาสิ้นสุด OT</label><input id="otAppEnd" type="time" class="input" value="${esc(reqEnd)}" /></div>
+        </div>
+        <label style="display:flex; gap:8px; align-items:flex-start; margin-top:10px; font-size:13px; cursor:pointer;">
+          <input type="checkbox" id="otOffsiteCheck" style="margin-top:3px;" />
+          <span><b>จ่าย OT เต็มตามที่อนุมัติ (ไม่เทียบสแกนนิ้ว)</b><br><span class="card-sub">ใช้กรณีงานนอกสถานที่ / ออกไปขับรถส่งของหลังสแกนออก</span></span>
+        </label>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="otAppCancel">ยกเลิก</button>
+          <button class="btn btn-success" id="otAppSave">✓ ยืนยันอนุมัติ OT</button>
+        </div>
+      </div></div>`;
+      $('otAppCancel').onclick = () => { root.innerHTML = ''; };
+      $('otAppSave').onclick = async () => {
+        const opts = {
+          approved_start: $('otAppStart').value,
+          approved_end: $('otAppEnd').value,
+          skip_scan_cap: $('otOffsiteCheck').checked
+        };
+        try {
+          await call('adminDecideItem', 'OT', id, true, '', opts);
+          root.innerHTML = '';
+          toast('อนุมัติโอทีและคำนวณข้อมูลใหม่เรียบร้อย', 'success');
+          loadInit();
+        } catch (err) { toast(err.message, 'error'); }
+      };
     }
 
     function renderPending(vacs, ots, unacks) {

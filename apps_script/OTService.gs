@@ -1,7 +1,10 @@
 /**
  * OTService.gs
- * จัดการคำขอทำโอที (ตอนนี้ใช้ระดับเดียวกันทั้งหมดก่อน และขยายเพิ่มระดับ 2/3 ได้ภายหลัง)
- * พนักงานขอผ่าน LIFF -> แฟน/หัวหน้างานอนุมัติหรือปฏิเสธ
+ * จัดการคำขอทำโอที:
+ * - แสดงเวลาสแกนเข้า-ออกจริงของวันนั้นให้ผู้อนุมัติเห็นก่อนกดอนุมัติ
+ * - ผู้อนุมัติสามารถแก้ไขเวลาเริ่ม-สิ้นสุด OT ก่อนกดอนุมัติได้
+ * - รองรับตัวเลือก "จ่าย OT เต็มตามที่อนุมัติ (งานนอกสถานที่/ไม่เทียบสแกนนิ้ว)" โดยไม่แก้เวลาสแกนดิบ
+ * - คำนวณ Attendance_Daily อัตโนมัติหลังอนุมัติ
  */
 
 function parseHmToMinutes(hm) {
@@ -16,6 +19,33 @@ function otWindow(startTime, endTime) {
   if (isNaN(s) || isNaN(e)) return null;
   if (e <= s) e += 24 * 60;
   return { start: s, end: e };
+}
+
+/**
+ * ดึงเวลาสแกนเข้า-ออกจริงของพนักงานในวันที่ระบุ (ดูจาก Attendance_Daily ก่อน ถ้ายังไม่มีค่อยดูจาก Attendance_Raw_YYYY)
+ */
+function getActualScanForDate(employeeId, dateStr) {
+  const empId = String(employeeId);
+  const daily = repoReadAll(SHEETS.ATTENDANCE_DAILY).rows.find(r =>
+    String(r.employee_id) === empId && String(r.work_date) === dateStr
+  );
+  if (daily && (daily.first_in || daily.last_out)) {
+    return { first_in: String(daily.first_in || ''), last_out: String(daily.last_out || '') };
+  }
+  try {
+    const year = String(dateStr).slice(0, 4);
+    const scans = repoReadRawByYear(year).rows
+      .filter(s => String(s.employee_id) === empId && String(s.timestamp || '').indexOf(dateStr) === 0)
+      .map(s => String(s.timestamp).slice(11, 16))
+      .sort()
+      .filter((t, i, arr) => i === 0 || parseHmToMinutes(t) - parseHmToMinutes(arr[i - 1]) > 2);
+    return {
+      first_in: scans.length > 0 ? scans[0] : '',
+      last_out: scans.length > 1 ? scans[scans.length - 1] : ''
+    };
+  } catch (_) {
+    return { first_in: '', last_out: '' };
+  }
 }
 
 function submitOTRequest(emp, payload) {
@@ -71,7 +101,9 @@ function submitOTRequest(emp, payload) {
 
   repoAppendRow(SHEETS.OT, record);
   repoAppendAuditLog(emp.employee_id, 'CREATE_OT', SHEETS.OT, record.request_id, null, record, 'พนักงานยื่นขอทำโอทีผ่าน LINE');
-  notifyApproverNewOT(record);
+
+  const actualScan = getActualScanForDate(emp.employee_id, otDate);
+  notifyApproverNewOT(record, actualScan);
   return record;
 }
 
@@ -87,10 +119,21 @@ function listPendingOTs() {
   const { rows } = repoReadAll(SHEETS.OT);
   return rows
     .filter(r => String(r.status).toUpperCase() === 'PENDING')
-    .sort((a, b) => String(a.ot_date).localeCompare(String(b.ot_date)));
+    .sort((a, b) => String(a.ot_date).localeCompare(String(b.ot_date)))
+    .map(r => {
+      const scan = getActualScanForDate(r.employee_id, r.ot_date);
+      return Object.assign({}, r, {
+        actual_first_in: scan.first_in,
+        actual_last_out: scan.last_out
+      });
+    });
 }
 
-function decideOT(requestId, isApproved, actorId, rejectReason) {
+/**
+ * อนุมัติ / ไม่อนุมัติ OT
+ * options (ไม่บังคับ): { approved_start, approved_end, skip_scan_cap }
+ */
+function decideOT(requestId, isApproved, actorId, rejectReason, options) {
   const { rows } = repoReadAll(SHEETS.OT);
   const target = rows.find(r => r.request_id === requestId);
   if (!target) throw new Error('ไม่พบคำขอโอทีที่ระบุครับ');
@@ -100,11 +143,28 @@ function decideOT(requestId, isApproved, actorId, rejectReason) {
 
   repoAssertPeriodEditable(target.ot_date);
 
+  const opts = options || {};
+  let appStart = target.requested_start;
+  let appEnd = target.requested_end;
+  let appHours = Number(target.requested_hours || 0);
+
+  if (isApproved && (opts.approved_start || opts.approved_end)) {
+    appStart = String(opts.approved_start || target.requested_start).trim();
+    appEnd = String(opts.approved_end || target.requested_end).trim();
+    const w = otWindow(appStart, appEnd);
+    if (!w || (w.end - w.start) < 1) {
+      throw new Error('เวลาอนุมัติโอทีไม่ถูกต้องครับ');
+    }
+    appHours = Number(((w.end - w.start) / 60).toFixed(2));
+  }
+
+  const skipScanCap = isApproved && !!opts.skip_scan_cap;
   const updates = {
     status: isApproved ? 'APPROVED' : 'REJECTED',
-    approved_start: isApproved ? target.requested_start : '',
-    approved_end: isApproved ? target.requested_end : '',
-    approved_hours: isApproved ? target.requested_hours : 0,
+    approved_start: isApproved ? appStart : '',
+    approved_end: isApproved ? appEnd : '',
+    actual_start: skipScanCap ? 'OFFSITE_OVERRIDE' : '',
+    approved_hours: isApproved ? appHours : 0,
     approver_id: actorId,
     approved_at: nowStr(),
     reject_reason: isApproved ? '' : String(rejectReason || '').trim()
@@ -112,8 +172,18 @@ function decideOT(requestId, isApproved, actorId, rejectReason) {
 
   repoUpdateRow(SHEETS.OT, target._rowIndex, updates);
   repoAppendAuditLog(actorId, isApproved ? 'APPROVE_OT' : 'REJECT_OT', SHEETS.OT, requestId,
-    { status: target.status }, updates, updates.reject_reason);
+    { status: target.status, requested_start: target.requested_start, requested_end: target.requested_end },
+    updates, skipScanCap ? 'อนุมัติ OT แบบจ่ายเต็ม (งานนอกสถานที่/ไม่เทียบสแกน)' : updates.reject_reason);
 
-  notifyEmployeeDecision(target.employee_id, 'โอที (' + target.requested_hours + ' ชม.)', target.ot_date, isApproved, updates.reject_reason);
+  notifyEmployeeDecision(
+    target.employee_id,
+    'โอที (' + (isApproved ? appHours : target.requested_hours) + ' ชม.)',
+    target.ot_date,
+    isApproved,
+    updates.reject_reason
+  );
+
+  // อัปเดต Attendance_Daily อัตโนมัติหลังอนุมัติ
+  if (isApproved) safeAutoRecompute(target.ot_date);
   return Object.assign({}, target, updates);
 }
