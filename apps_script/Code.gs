@@ -211,3 +211,20 @@ function adminGetAttachment(adminSecret, fileId) {
   verifyAdminSecret(adminSecret);
   return getAttachmentDataUrl(fileId);
 }
+
+/* ================= Payroll Sheet Integration & Pay Slip ================= */
+
+function adminSyncTimeClockToPayroll(adminSecret, yearMonth) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => syncTimeClockToPayrollSheet(yearMonth, 'ADMIN'));
+}
+
+function adminGetPayrollData(adminSecret) {
+  verifyAdminSecret(adminSecret);
+  return getPayrollDashboardData();
+}
+
+function adminUpdatePayrollRow(adminSecret, rowIndex, updates) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => updatePayrollCalculationRow(rowIndex, updates, 'ADMIN'));
+}

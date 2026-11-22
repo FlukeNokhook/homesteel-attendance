@@ -186,6 +186,7 @@
       <button class="nav-item" data-tab="person"><span class="ico">👤</span>ตรวจสอบรายคน</button>
       <button class="nav-item" data-tab="pending"><span class="ico">⏳</span>อนุมัติ / รับทราบ <span class="count hidden" data-pending-count>0</span></button>
       <button class="nav-item" data-tab="import"><span class="ico">📥</span>นำเข้าเวลาสแกนนิ้ว</button>
+      <button class="nav-item" data-tab="payroll"><span class="ico">💰</span>เงินเดือน & สลิป</button>
       <button class="nav-item" data-tab="close"><span class="ico">🔒</span>ปิดงวด & Export</button>
       <div class="sidebar-foot">
         <button class="nav-item" onclick="logout()"><span class="ico">↩</span>ออกจากระบบ</button>
@@ -280,6 +281,26 @@
         </div>
       </section>
 
+      <!-- Tab: Payroll & Pay Slip -->
+      <section id="tab-payroll" class="hidden">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3 class="card-title">💰 คำนวณเงินเดือน & พิมพ์สลิป (เชื่อม Google Sheet เงินเดือน)</h3>
+              <div id="payrollSub" class="card-sub">กรอกข้อมูลได้ทั้งใน Google Sheet และบนหน้านี้ ซิงก์กันทันที</div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-primary btn-sm" onclick="syncToPayrollSheet()">📤 ส่งเวลาเข้า Sheet เงินเดือน</button>
+              <button class="btn btn-ghost btn-sm" onclick="loadPayroll()">🔄 โหลดยอดล่าสุด</button>
+              <a id="openPayrollSheetLink" href="#" target="_blank" class="btn btn-soft-blue btn-sm hidden">📄 เปิด Google Sheet เงินเดือน</a>
+              <button class="btn btn-success btn-sm" onclick="printAllSlips()">🖨️ พิมพ์สลิปทั้งหมดทีเดียว</button>
+            </div>
+          </div>
+          <div id="payrollStats" class="stats" style="margin-bottom:14px;"></div>
+          <div id="payrollTableWrap"></div>
+        </div>
+      </section>
+
       <!-- Tab: Close & Export -->
       <section id="tab-close" class="hidden">
         <div class="callout warn">
@@ -311,11 +332,12 @@
       </section>
     </main>
 
-    <nav class="mobile-nav">
+    <nav class="mobile-nav" style="grid-template-columns:repeat(6,1fr);">
       <button class="active" data-tab="overview"><span class="ico">📊</span>ภาพรวม</button>
       <button data-tab="person"><span class="ico">👤</span>รายคน</button>
       <button data-tab="pending"><span class="ico">⏳</span>อนุมัติ<span class="dot hidden" data-pending-count>0</span></button>
       <button data-tab="import"><span class="ico">📥</span>นำเข้า</button>
+      <button data-tab="payroll"><span class="ico">💰</span>เงินเดือน</button>
       <button data-tab="close"><span class="ico">🔒</span>ปิดงวด</button>
     </nav>
   </div>
@@ -328,6 +350,7 @@
       person: ['ตรวจสอบรายคน', 'เลือกพนักงานเพื่อตรวจเวลาเข้า-ออก ใบลา โอที และแก้ไขเวลา'],
       pending: ['อนุมัติ / รับทราบ', 'อนุมัติลาพักร้อน-โอที และกดรับทราบใบลากิจ-ลาป่วย'],
       import: ['นำเข้าเวลาสแกนนิ้ว', 'สำหรับช่วงที่ดึงข้อมูลแบบ Manual'],
+      payroll: ['เงินเดือน & สลิป', 'เชื่อม Google Sheet เงินเดือน แก้ไขรายได้/รายการหัก และพิมพ์สลิป'],
       close: ['ปิดงวด & Export', 'ส่งออกไฟล์เข้า Excel เงินเดือนและล็อกงวด']
     };
     const DOW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
@@ -440,6 +463,7 @@
       $('pageTitle').textContent = TAB_META[tab][0];
       $('pageSub').textContent = TAB_META[tab][1] + ' • ' + ymLabel($('monthPicker').value);
       if (tab === 'person') loadPerson();
+      if (tab === 'payroll') loadPayroll();
     }
 
     function statCard(icon, bg, label, val, unit) {
@@ -767,6 +791,214 @@
       if (!reason) return;
       try { await call('adminSetPeriodStatus', ym, 'open', reason); toast('ปลดล็อกงวดเรียบร้อยแล้ว', 'success'); loadInit(); }
       catch (err) { toast(err.message, 'error'); }
+    }
+
+    /* ================= Payroll & Pay Slip Printer ================= */
+    let PAYROLL_CACHE = { periodTitle: '', employees: [], sheetUrl: '' };
+    const fmtBaht = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    async function loadPayroll() {
+      try {
+        const res = await call('adminGetPayrollData');
+        PAYROLL_CACHE = res;
+        if (res.sheetUrl) {
+          $('openPayrollSheetLink').href = res.sheetUrl;
+          $('openPayrollSheetLink').classList.remove('hidden');
+        }
+        $('payrollSub').textContent = (res.periodTitle ? res.periodTitle + ' • ' : '') + 'ข้อมูลสดจากชีต Calculation (สูตร PND 1 / ค่าคอมฯ / ค่าวัดหน้างาน / ค่าหาโครง)';
+
+        const emps = res.employees || [];
+        const sumNet = emps.reduce((s, e) => s + Number(e.net_pay || 0), 0);
+        const sumOt = emps.reduce((s, e) => s + Number(e.ot_baht || 0), 0);
+        const sumSso = emps.reduce((s, e) => s + Math.abs(Number(e.sso || 0)), 0);
+        const sumTax = emps.reduce((s, e) => s + Math.abs(Number(e.tax || 0)), 0);
+
+        $('payrollStats').innerHTML = [
+          statCard('👥', 'var(--brand-soft)', 'พนักงานในงวด', emps.length, 'คน'),
+          statCard('💵', 'var(--green-soft)', 'ยอดจ่ายสุทธิรวม', fmtBaht(sumNet), 'บาท'),
+          statCard('⏰', 'var(--amber-soft)', 'OT รวม', fmtBaht(sumOt), 'บาท'),
+          statCard('🏥', '#f1f5f9', 'ประกันสังคมรวม', fmtBaht(sumSso), 'บาท'),
+          statCard('🧾', 'var(--violet-soft)', 'ภาษี (PND 1) รวม', fmtBaht(sumTax), 'บาท')
+        ].join('');
+
+        if (!emps.length) {
+          $('payrollTableWrap').innerHTML = emptyState('📄', 'ไม่พบข้อมูลพนักงานในชีต Calculation');
+          return;
+        }
+        $('payrollTableWrap').innerHTML = `<div class="table-wrap"><table>
+          <thead><tr><th>รหัส</th><th>ชื่อ-สกุล (ชื่อเล่น)</th><th class="num">ฐานเงินเดือน</th><th class="num">OT (บ.)</th><th class="num">คอม+วัด+โครง</th><th class="num">เบี้ยขยัน</th><th class="num">หักรวม+SSO+ภาษี</th><th class="num">ยอดจ่ายสุทธิ</th><th>จัดการ</th></tr></thead>
+          <tbody>${emps.map((e, i) => {
+            const extra = e.commission + e.measurement + e.frame_bonus;
+            const totalDed = e.deduct_absent + e.deduct_pvd + e.deduct_uniform + e.deduct_goods + e.deduct_damage + e.deduct_other + e.deduct_forbid_absent + e.deduct_late + e.sso + e.tax;
+            return `<tr>
+              <td class="mono">${esc(e.code)}</td>
+              <td><b>${esc(e.name)}</b> <span class="card-sub">${esc(e.nickname ? '(' + e.nickname + ')' : '')}</span></td>
+              <td class="num">${fmtBaht(e.base_salary)}</td>
+              <td class="num">${fmtBaht(e.ot_baht)}</td>
+              <td class="num">${fmtBaht(extra)}</td>
+              <td class="num">${fmtBaht(e.diligence)}</td>
+              <td class="num" style="color:var(--red);">${fmtBaht(totalDed)}</td>
+              <td class="num"><b>${fmtBaht(e.net_pay)}</b></td>
+              <td style="white-space:nowrap;">
+                <button class="btn btn-ghost btn-sm" onclick="openEditPayrollModal(${i})">✏️ แก้ไข</button>
+                <button class="btn btn-soft-blue btn-sm" onclick="printSingleSlip(${i})">🖨️ สลิป</button>
+              </td>
+            </tr>`;
+          }).join('')}</tbody></table></div>`;
+      } catch (err) {
+        $('payrollStats').innerHTML = '';
+        $('payrollTableWrap').innerHTML = `<div class="callout warn"><span>⚠️</span><div>${esc(err.message)}</div></div>`;
+      }
+    }
+
+    async function syncToPayrollSheet() {
+      const ym = $('monthPicker').value;
+      const ok = await modal({ title: `ส่งเวลาเดือน ${ymLabel(ym)} เข้า Sheet เงินเดือน?`, body: 'ระบบจะนำข้อมูล 15 คอลัมน์ไปเขียนลงชีต "Time Clock" ใน Google Sheet เงินเดือนโดยตรง', confirmText: '📤 ส่งข้อมูลเลย', confirmClass: 'btn-primary' });
+      if (!ok) return;
+      try {
+        const res = await call('adminSyncTimeClockToPayroll', ym);
+        toast(`ส่งข้อมูล ${res.rowsWritten} แถวเข้าชีต Time Clock เรียบร้อย`, 'success');
+        loadPayroll();
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    function openEditPayrollModal(idx) {
+      const e = PAYROLL_CACHE.employees[idx];
+      if (!e) return;
+      const root = $('modalRoot');
+      root.innerHTML = `<div class="modal-bg"><div class="modal">
+        <h3>แก้ไขรายได้ / รายการหัก • ${esc(e.name)}</h3>
+        <p>บันทึกลงชีต Calculation โดยตรง (รายการหักให้ใส่เครื่องหมายลบ เช่น -200)</p>
+        <div class="grid-2">
+          <div><label class="card-sub">ฐานเงินเดือน (F)</label><input id="epSalary" type="number" class="input" value="${e.base_salary}" /></div>
+          <div><label class="card-sub">เบี้ยขยัน (AT)</label><input id="epDil" type="number" class="input" value="${e.diligence}" /></div>
+          <div><label class="card-sub">ค่าประจำตำแหน่ง (AU)</label><input id="epPos" type="number" class="input" value="${e.position_allowance}" /></div>
+          <div><label class="card-sub">เงินพิเศษ/มือถือ (AV)</label><input id="epPhone" type="number" class="input" value="${e.phone_allowance}" /></div>
+          <div><label class="card-sub">หักค่าสินค้า (BA)</label><input id="epGoods" type="number" class="input" value="${e.deduct_goods}" /></div>
+          <div><label class="card-sub">หักค่าเสียหาย (BB)</label><input id="epDmg" type="number" class="input" value="${e.deduct_damage}" /></div>
+          <div><label class="card-sub">เงินหักอื่นๆ/ลืมสแกน (BC)</label><input id="epOther" type="number" class="input" value="${e.deduct_other}" /></div>
+          <div><label class="card-sub">หักขาดวันห้ามหยุด (BD)</label><input id="epForbid" type="number" class="input" value="${e.deduct_forbid_absent}" /></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="epCancel">ยกเลิก</button>
+          <button class="btn btn-primary" id="epSave">💾 บันทึก</button>
+        </div>
+      </div></div>`;
+      $('epCancel').onclick = () => { root.innerHTML = ''; };
+      $('epSave').onclick = async () => {
+        try {
+          await call('adminUpdatePayrollRow', e.rowIndex, {
+            base_salary: $('epSalary').value,
+            diligence: $('epDil').value,
+            position_allowance: $('epPos').value,
+            phone_allowance: $('epPhone').value,
+            deduct_goods: $('epGoods').value,
+            deduct_damage: $('epDmg').value,
+            deduct_other: $('epOther').value,
+            deduct_forbid_absent: $('epForbid').value
+          });
+          root.innerHTML = '';
+          toast('บันทึกข้อมูลลง Sheet เงินเดือนเรียบร้อย', 'success');
+          loadPayroll();
+        } catch (err) { toast(err.message, 'error'); }
+      };
+    }
+
+    function buildSlipHtml(e, periodTitle) {
+      const earnings = [
+        ['เงินเดือน / Salary', e.base_salary],
+        ['ค่าล่วงเวลา / OT', e.ot_baht],
+        ['ค่าคอมมิชชั่น / Commission', e.commission],
+        ['ค่าวัดหน้างาน / Measurement', e.measurement],
+        ['ค่าหาโครง / Frame Bonus', e.frame_bonus],
+        ['เบี้ยขยัน / Diligence', e.diligence],
+        ['ค่าประจำตำแหน่ง / Position', e.position_allowance],
+        ['เงินพิเศษ / ค่ามือถือ', e.phone_allowance]
+      ].filter(x => x[1] !== 0);
+
+      const deductions = [
+        ['หักขาดงาน / Absent', Math.abs(e.deduct_absent)],
+        ['หักมาสายเกินกำหนด / Late', Math.abs(e.deduct_late)],
+        ['หักขาดงานวันห้ามหยุด', Math.abs(e.deduct_forbid_absent)],
+        ['กองทุนสำรองเลี้ยงชีพ / PVD', Math.abs(e.deduct_pvd)],
+        ['ค่าชุดยูนิฟอร์ม / Uniform', Math.abs(e.deduct_uniform)],
+        ['หักค่าสินค้า', Math.abs(e.deduct_goods)],
+        ['หักค่าเสียหาย', Math.abs(e.deduct_damage)],
+        ['เงินหักอื่นๆ', Math.abs(e.deduct_other)],
+        ['ประกันสังคม / SSO', Math.abs(e.sso)],
+        ['ภาษีหัก ณ ที่จ่าย / Tax', Math.abs(e.tax)]
+      ].filter(x => x[1] !== 0);
+
+      const sumEarn = earnings.reduce((s, x) => s + x[1], 0);
+      const sumDed = deductions.reduce((s, x) => s + x[1], 0);
+      const maxRows = Math.max(earnings.length, deductions.length, 4);
+      let rowsHtml = '';
+      for (let i = 0; i < maxRows; i++) {
+        const er = earnings[i], dr = deductions[i];
+        rowsHtml += `<tr>
+          <td>${er ? esc(er[0]) : ''}</td><td class="r">${er ? fmtBaht(er[1]) : ''}</td>
+          <td>${dr ? esc(dr[0]) : ''}</td><td class="r">${dr ? fmtBaht(dr[1]) : ''}</td>
+        </tr>`;
+      }
+
+      return `<div class="slip">
+        <div class="slip-head">
+          <div><h2>ใบแจ้งเงินเดือน / Pay Slip</h2><div class="sub">${esc(periodTitle || ymLabel($('monthPicker').value))}</div></div>
+          <div style="text-align:right;"><b>โฮมสตีล เซ็นเตอร์ สาขาขอนแก่น</b><div class="sub">CONFIDENTIAL / ลับเฉพาะ</div></div>
+        </div>
+        <div class="slip-meta">
+          <div><b>รหัสพนักงาน:</b> ${esc(e.code)}</div><div><b>ตำแหน่ง:</b> ${esc(e.position || '-')}</div>
+          <div><b>ชื่อ-สกุล:</b> ${esc(e.name)} ${esc(e.nickname ? '(' + e.nickname + ')' : '')}</div><div><b>วันที่เริ่มงาน:</b> ${esc(e.hire_date || '-')}</div>
+          <div><b>ธนาคาร:</b> ${esc(e.bank || '-')} ${esc(e.bank_account || '')}</div><div><b>ฐานเงินเดือน:</b> ${fmtBaht(e.base_salary)} บาท</div>
+        </div>
+        <table class="slip-tbl">
+          <thead><tr><th>รายได้ / Earning</th><th class="r">จำนวนเงิน</th><th>รายการหัก / Deduction</th><th class="r">จำนวนเงิน</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot>
+            <tr><th>รวมรายได้</th><th class="r">${fmtBaht(sumEarn)}</th><th>รวมรายการหัก</th><th class="r">${fmtBaht(sumDed)}</th></tr>
+          </tfoot>
+        </table>
+        <div class="slip-net">ยอดจ่ายเงินสุทธิ / Net Pay: <b>${fmtBaht(e.net_pay)} บาท</b></div>
+      </div>`;
+    }
+
+    function openPrintWindow(slipsHtml, title) {
+      const w = window.open('', '_blank', 'width=900,height=700');
+      if (!w) { toast('เบราว์เซอร์บล็อกหน้าต่างป๊อปอัพ กรุณาอนุญาต Pop-up เพื่อพิมพ์สลิปครับ', 'error'); return; }
+      w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>${esc(title)}</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, sans-serif; color: #111; margin: 0; padding: 16px; background: #fff; }
+          .slip { border: 1.5px solid #334155; border-radius: 10px; padding: 18px 20px; margin-bottom: 24px; page-break-after: always; }
+          .slip:last-child { page-break-after: auto; }
+          .slip-head { display: flex; justify-content: space-between; border-bottom: 2px solid #1e3a8a; padding-bottom: 8px; margin-bottom: 12px; }
+          .slip-head h2 { margin: 0; font-size: 18px; color: #1e3a8a; }
+          .sub { font-size: 12px; color: #475569; }
+          .slip-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; font-size: 13px; margin-bottom: 12px; }
+          .slip-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+          .slip-tbl th, .slip-tbl td { border: 1px solid #cbd5e1; padding: 6px 8px; }
+          .slip-tbl th { background: #f1f5f9; text-align: left; }
+          .r { text-align: right; font-variant-numeric: tabular-nums; }
+          .slip-net { margin-top: 12px; text-align: right; font-size: 16px; background: #eff6ff; padding: 10px 14px; border-radius: 8px; color: #1e3a8a; }
+          @media print { body { padding: 0; } .no-print { display: none; } }
+        </style></head><body>
+        <div class="no-print" style="margin-bottom:14px; text-align:right;">
+          <button onclick="window.print()" style="padding:8px 18px; background:#1d4ed8; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:14px;">🖨️ สั่งพิมพ์ / บันทึก PDF</button>
+        </div>
+        ${slipsHtml}
+      </body></html>`);
+      w.document.close();
+    }
+
+    function printSingleSlip(idx) {
+      const e = PAYROLL_CACHE.employees[idx];
+      if (!e) return;
+      openPrintWindow(buildSlipHtml(e, PAYROLL_CACHE.periodTitle), `Pay Slip - ${e.name}`);
+    }
+
+    function printAllSlips() {
+      const emps = PAYROLL_CACHE.employees || [];
+      if (!emps.length) { toast('ยังไม่มีข้อมูลสลิปสำหรับพิมพ์ครับ', 'error'); return; }
+      openPrintWindow(emps.map(e => buildSlipHtml(e, PAYROLL_CACHE.periodTitle)).join(''), `Pay Slips - ${PAYROLL_CACHE.periodTitle || 'All'}`);
     }
   </script>
 </body>

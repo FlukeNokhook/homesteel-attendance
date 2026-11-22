@@ -42,6 +42,7 @@ function getAppConfig() {
   const props = PropertiesService.getScriptProperties();
   return {
     SHEET_ID: props.getProperty('SHEET_ID') || '',
+    PAYROLL_SHEET_ID: props.getProperty('PAYROLL_SHEET_ID') || '',
     DRIVE_FOLDER_ID: props.getProperty('DRIVE_FOLDER_ID') || '',
     LINE_CHANNEL_ID: props.getProperty('LINE_CHANNEL_ID') || '',
     LINE_CHANNEL_ACCESS_TOKEN: props.getProperty('LINE_CHANNEL_ACCESS_TOKEN') || '',
