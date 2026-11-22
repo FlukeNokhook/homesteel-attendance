@@ -293,7 +293,8 @@
               <button class="btn btn-primary btn-sm" onclick="syncToPayrollSheet()">📤 ส่งข้อมูลเข้า Calculation + Time Clock</button>
               <button class="btn btn-ghost btn-sm" onclick="loadPayroll()">🔄 โหลดยอดล่าสุด</button>
               <a id="openPayrollSheetLink" href="#" target="_blank" class="btn btn-soft-blue btn-sm hidden">📄 เปิด Google Sheet เงินเดือน</a>
-              <button class="btn btn-success btn-sm" onclick="printAllSlips()">🖨️ พิมพ์สลิปทั้งหมดทีเดียว</button>
+              <button class="btn btn-success btn-sm" onclick="printAllSlips()">🖨️ พิมพ์สลิปทั้งหมด</button>
+              <button class="btn btn-soft-green btn-sm" onclick="saveAllSlipsPdf()">📁 บันทึก PDF ทั้งหมดลง Drive</button>
             </div>
           </div>
           <div id="payrollStats" class="stats" style="margin-bottom:14px;"></div>
@@ -851,6 +852,7 @@
               <td style="white-space:nowrap;">
                 <button class="btn btn-ghost btn-sm" onclick="openEditPayrollModal(${i})">✏️ แก้ไข</button>
                 <button class="btn btn-soft-blue btn-sm" onclick="printSingleSlip(${i})">🖨️ สลิป</button>
+                <button class="btn btn-soft-green btn-sm" onclick="saveSingleSlipPdf(${i})">📄 PDF</button>
               </td>
             </tr>`;
           }).join('')}</tbody></table></div>`;
@@ -964,11 +966,18 @@
         </tr>`;
       }
 
+      const logoImg = PAYROLL_CACHE.logoDataUrl
+        ? `<img src="${PAYROLL_CACHE.logoDataUrl}" alt="Homesteel" style="height:48px; width:auto; margin-right:12px;" />`
+        : '';
+
       return `<div class="slip">
         <div class="slip-head">
-          <div>
-            <h2>ใบแจ้งเงินเดือน / Pay Slip</h2>
-            <div class="period">เดือน ${esc(periodTitle || monthTh)}</div>
+          <div style="display:flex; align-items:center;">
+            ${logoImg}
+            <div>
+              <h2>ใบแจ้งเงินเดือน / Pay Slip</h2>
+              <div class="period">เดือน ${esc(periodTitle || monthTh)}</div>
+            </div>
           </div>
           <div style="text-align:right;">
             <div class="comp">โฮมสตีล เซ็นเตอร์ สาขาขอนแก่น</div>
@@ -1065,16 +1074,14 @@
       </div>`;
     }
 
-    function openPrintWindow(slipsHtml, title) {
-      const w = window.open('', '_blank', 'width=920,height=780');
-      if (!w) { toast('เบราว์เซอร์บล็อกหน้าต่างป๊อปอัพ กรุณาอนุญาต Pop-up เพื่อพิมพ์สลิปครับ', 'error'); return; }
-      w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>${esc(title)}</title>
+    function buildPrintableDocument(slipsHtml, title, forPdf) {
+      return `<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>${esc(title)}</title>
         <style>
           @page { size: A4 portrait; margin: 12mm; }
-          body { font-family: 'Sarabun', 'Segoe UI', Tahoma, sans-serif; color: #111; margin: 0; padding: 14px; background: #fff; font-size: 12.5px; }
-          .slip { border: 1.5px solid #1e293b; padding: 16px 18px; margin-bottom: 24px; page-break-after: always; }
+          body { font-family: 'Sarabun', 'Segoe UI', Tahoma, sans-serif; color: #111; margin: 0; padding: ${forPdf ? '0' : '14px'}; background: #fff; font-size: 12.5px; }
+          .slip { border: 1.5px solid #1e293b; padding: 16px 18px; margin-bottom: 20px; page-break-after: always; }
           .slip:last-child { page-break-after: auto; }
-          .slip-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1e3a8a; padding-bottom: 8px; margin-bottom: 10px; }
+          .slip-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 8px; margin-bottom: 10px; }
           .slip-head h2 { margin: 0; font-size: 18px; color: #1e3a8a; }
           .period { font-size: 13px; font-weight: 600; margin-top: 2px; }
           .comp { font-size: 15px; font-weight: 700; color: #0f172a; }
@@ -1102,11 +1109,17 @@
           .mini-tbl thead tr:nth-child(2) th { background: #f8fafc; }
           @media print { body { padding: 0; } .no-print { display: none; } }
         </style></head><body>
-        <div class="no-print" style="margin-bottom:14px; text-align:right;">
+        ${forPdf ? '' : `<div class="no-print" style="margin-bottom:14px; text-align:right;">
           <button onclick="window.print()" style="padding:8px 18px; background:#1d4ed8; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:14px;">🖨️ สั่งพิมพ์ / บันทึก PDF</button>
-        </div>
+        </div>`}
         ${slipsHtml}
-      </body></html>`);
+      </body></html>`;
+    }
+
+    function openPrintWindow(slipsHtml, title) {
+      const w = window.open('', '_blank', 'width=920,height=780');
+      if (!w) { toast('เบราว์เซอร์บล็อกหน้าต่างป๊อปอัพ กรุณาอนุญาต Pop-up เพื่อพิมพ์สลิปครับ', 'error'); return; }
+      w.document.write(buildPrintableDocument(slipsHtml, title, false));
       w.document.close();
     }
 
@@ -1120,6 +1133,46 @@
       const emps = PAYROLL_CACHE.employees || [];
       if (!emps.length) { toast('ยังไม่มีข้อมูลสลิปสำหรับพิมพ์ครับ', 'error'); return; }
       openPrintWindow(emps.map(e => buildSlipHtml(e, PAYROLL_CACHE.periodTitle)).join(''), `Pay Slips - ${PAYROLL_CACHE.periodTitle || 'All'}`);
+    }
+
+    async function saveSingleSlipPdf(idx) {
+      const e = PAYROLL_CACHE.employees[idx];
+      if (!e) return;
+      const ym = $('monthPicker').value;
+      const fileName = `PaySlip_${ym}_${e.code}_${e.name}.pdf`;
+      const html = buildPrintableDocument(buildSlipHtml(e, PAYROLL_CACHE.periodTitle), fileName, true);
+      try {
+        const res = await call('adminSavePaySlipPdf', html, fileName, ym);
+        modal({
+          title: '✅ บันทึก PDF ลง Google Drive เรียบร้อย',
+          html: `<p>ไฟล์: <b>${esc(res.fileName)}</b><br>โฟลเดอร์: <code>PaySlips/${esc(ym)}</code></p>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <a href="${esc(res.fileUrl)}" target="_blank" class="btn btn-primary btn-sm">📄 เปิดดูไฟล์ PDF</a>
+              <a href="${esc(res.folderUrl)}" target="_blank" class="btn btn-ghost btn-sm">📁 เปิดโฟลเดอร์ใน Drive</a>
+            </div>`,
+          hideConfirm: true
+        });
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    async function saveAllSlipsPdf() {
+      const emps = PAYROLL_CACHE.employees || [];
+      if (!emps.length) { toast('ยังไม่มีข้อมูลสลิปสำหรับบันทึกครับ', 'error'); return; }
+      const ym = $('monthPicker').value;
+      const fileName = `PaySlips_All_${ym}.pdf`;
+      const html = buildPrintableDocument(emps.map(e => buildSlipHtml(e, PAYROLL_CACHE.periodTitle)).join(''), fileName, true);
+      try {
+        const res = await call('adminSavePaySlipPdf', html, fileName, ym);
+        modal({
+          title: '✅ บันทึก PDF ทั้งหมดลง Google Drive เรียบร้อย',
+          html: `<p>ไฟล์: <b>${esc(res.fileName)}</b> (${emps.length} คน)<br>โฟลเดอร์: <code>PaySlips/${esc(ym)}</code></p>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <a href="${esc(res.fileUrl)}" target="_blank" class="btn btn-primary btn-sm">📄 เปิดดูไฟล์ PDF</a>
+              <a href="${esc(res.folderUrl)}" target="_blank" class="btn btn-ghost btn-sm">📁 เปิดโฟลเดอร์ใน Drive</a>
+            </div>`,
+          hideConfirm: true
+        });
+      } catch (err) { toast(err.message, 'error'); }
     }
   </script>
 </body>

@@ -296,7 +296,42 @@ function getPayrollDashboardData() {
     sheetUrl: payrollSs.getUrl(),
     isCleanLayout: isCleanLayout,
     periodTitle: isCleanLayout ? '' : String(values[0][6] || ''),
+    logoDataUrl: typeof COMPANY_LOGO_DATA_URL !== 'undefined' ? COMPANY_LOGO_DATA_URL : '',
     employees: employees
+  };
+}
+
+/**
+ * แปลงสลิปเงินเดือน HTML (พร้อมโลโก้บริษัท) เป็นไฟล์ PDF แล้วบันทึกเข้า Google Drive แบบ Private
+ * โครงสร้างโฟลเดอร์: <DRIVE_FOLDER_ID>/PaySlips/<YYYY-MM>/
+ */
+function savePaySlipPdfToDrive(htmlContent, fileName, yearMonth, actor) {
+  const cfg = getAppConfig();
+  if (!cfg.DRIVE_FOLDER_ID) {
+    throw new Error('ยังไม่ได้ตั้งค่า DRIVE_FOLDER_ID ใน Script Properties ครับ');
+  }
+  const root = DriveApp.getFolderById(cfg.DRIVE_FOLDER_ID);
+  const slipsRoot = getOrCreateSubFolder(root, 'PaySlips');
+  const monthFolder = getOrCreateSubFolder(slipsRoot, String(yearMonth || todayStr().slice(0, 7)));
+
+  const safeName = String(fileName || 'PaySlip.pdf').replace(/[\\/:*?"<>|]/g, '_');
+  const pdfBlob = Utilities.newBlob(htmlContent, 'text/html', 'slip.html')
+    .getAs('application/pdf')
+    .setName(safeName.endsWith('.pdf') ? safeName : safeName + '.pdf');
+
+  // หากมีไฟล์ชื่อซ้ำในเดือนเดียวกัน ให้ลบไฟล์เก่าก่อนแล้วสร้างใหม่ (อัปเดตเวอร์ชันล่าสุด)
+  const existing = monthFolder.getFilesByName(pdfBlob.getName());
+  while (existing.hasNext()) existing.next().setTrashed(true);
+
+  const file = monthFolder.createFile(pdfBlob);
+  repoAppendAuditLog(actor || 'admin', 'SAVE_PAYSLIP_PDF', 'Drive_PaySlips', file.getId(),
+    null, { fileName: file.getName(), yearMonth: yearMonth }, 'บันทึกสลิปเงินเดือน PDF ลง Google Drive');
+
+  return {
+    fileId: file.getId(),
+    fileName: file.getName(),
+    fileUrl: file.getUrl(),
+    folderUrl: monthFolder.getUrl()
   };
 }
 

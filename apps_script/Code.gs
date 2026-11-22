@@ -238,3 +238,8 @@ function adminUpdatePayrollRow(adminSecret, rowIndex, updates) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => updatePayrollCalculationRow(rowIndex, updates, 'ADMIN'));
 }
+
+function adminSavePaySlipPdf(adminSecret, htmlContent, fileName, yearMonth) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => savePaySlipPdfToDrive(htmlContent, fileName, yearMonth, 'ADMIN'));
+}
