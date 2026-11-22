@@ -224,6 +224,11 @@ function adminSyncTimeClockToPayroll(adminSecret, yearMonth) {
   return withScriptLock(() => syncTimeClockToPayrollSheet(yearMonth, 'ADMIN'));
 }
 
+function adminSetupCleanPayroll(adminSecret) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => setupCleanPayrollSheet('ADMIN'));
+}
+
 function adminGetPayrollData(adminSecret) {
   verifyAdminSecret(adminSecret);
   return getPayrollDashboardData();
