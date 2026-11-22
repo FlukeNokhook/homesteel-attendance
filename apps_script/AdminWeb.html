@@ -914,80 +914,192 @@
     }
 
     function buildSlipHtml(e, periodTitle) {
-      const earnings = [
-        ['เงินเดือน / Salary', e.base_salary],
-        ['ค่าล่วงเวลา / OT', e.ot_baht],
-        ['ค่าคอมมิชชั่น / Commission', e.commission],
-        ['ค่าวัดหน้างาน / Measurement', e.measurement],
-        ['ค่าหาโครง / Frame Bonus', e.frame_bonus],
-        ['เบี้ยขยัน / Diligence', e.diligence],
-        ['ค่าประจำตำแหน่ง / Position', e.position_allowance],
-        ['เงินพิเศษ / ค่ามือถือ', e.phone_allowance]
-      ].filter(x => x[1] !== 0);
+      const ym = $('monthPicker').value;
+      const [y, m] = ym.split('-').map(Number);
+      const lastDay = new Date(y, m, 0).getDate();
+      const monthTh = ymLabel(ym);
+      const calcRange = `1-${lastDay} ${monthTh}`;
+      const payDate = `${lastDay} ${monthTh}`;
 
-      const deductions = [
-        ['หักขาดงาน / Absent', Math.abs(e.deduct_absent)],
-        ['หักมาสายเกินกำหนด / Late', Math.abs(e.deduct_late)],
-        ['หักขาดงานวันห้ามหยุด', Math.abs(e.deduct_forbid_absent)],
-        ['กองทุนสำรองเลี้ยงชีพ / PVD', Math.abs(e.deduct_pvd)],
-        ['ค่าชุดยูนิฟอร์ม / Uniform', Math.abs(e.deduct_uniform)],
-        ['หักค่าสินค้า', Math.abs(e.deduct_goods)],
-        ['หักค่าเสียหาย', Math.abs(e.deduct_damage)],
-        ['เงินหักอื่นๆ', Math.abs(e.deduct_other)],
-        ['ประกันสังคม / SSO', Math.abs(e.sso)],
-        ['ภาษีหัก ณ ที่จ่าย / Tax', Math.abs(e.tax)]
-      ].filter(x => x[1] !== 0);
+      const earnedSalary = Number(e.base_salary || 0);
+      const earnRows = [
+        ['เงินเดือน', e.work_hours ? e.work_hours : 240, earnedSalary],
+        ['OTx1.5', e.ot15_hours || 0, e.ot_baht || 0],
+        ['OTx2', e.ot20_hours || 0, 0],
+        ['OTx3', e.ot30_hours || 0, 0],
+        ['ค่าคอมมิชชั่น', '', e.commission || 0],
+        ['ค่าวัดหน้างาน', '', e.measurement || 0],
+        ['ค่าหาโครง', '', e.frame_bonus || 0],
+        ['เบี้ยขยัน', '', e.diligence || 0],
+        ['ค่าประจำตำแหน่งงาน', '', e.position_allowance || 0],
+        ['เงินพิเศษ/เงินเพิ่มค่ามือถือ', '', e.phone_allowance || 0]
+      ];
 
-      const sumEarn = earnings.reduce((s, x) => s + x[1], 0);
-      const sumDed = deductions.reduce((s, x) => s + x[1], 0);
-      const maxRows = Math.max(earnings.length, deductions.length, 4);
+      const dedRows = [
+        ['หักขาดงาน', e.deduct_absent || 0],
+        ['หักกองทุนสำรองเลี้ยงชีพ', e.deduct_pvd || 0],
+        ['หักค่าชุดยูนิฟอร์ม/ประกันทำงาน', e.deduct_uniform || 0],
+        ['หักค่าสินค้า', e.deduct_goods || 0],
+        ['หักค่าเสียหายจากการทำงาน', e.deduct_damage || 0],
+        ['หักสวัสดิการอื่นๆ', e.deduct_other || 0],
+        ['หักเงินขาดงานวันห้ามหยุด', e.deduct_forbid_absent || 0],
+        ['หักเงินมาทำงานสายเกินกำหนด' + (e.late_min ? ` (${e.late_min} นาที)` : '(นาที)'), e.deduct_late || 0],
+        ['หักประกันสังคม', e.sso || 0],
+        ['หักภาษี', e.tax || 0]
+      ];
+
+      const sumEarn = earnRows.reduce((s, r) => s + Number(r[2] || 0), 0);
+      const sumDed = dedRows.reduce((s, r) => s + Number(r[1] || 0), 0);
+      const netBeforeRound = sumEarn + sumDed;
+
       let rowsHtml = '';
-      for (let i = 0; i < maxRows; i++) {
-        const er = earnings[i], dr = deductions[i];
+      for (let i = 0; i < earnRows.length; i++) {
+        const er = earnRows[i], dr = dedRows[i];
         rowsHtml += `<tr>
-          <td>${er ? esc(er[0]) : ''}</td><td class="r">${er ? fmtBaht(er[1]) : ''}</td>
-          <td>${dr ? esc(dr[0]) : ''}</td><td class="r">${dr ? fmtBaht(dr[1]) : ''}</td>
+          <td>${esc(er[0])}</td>
+          <td class="c">${er[1] !== '' ? esc(er[1]) : ''}</td>
+          <td class="r">${fmtBaht(er[2])}</td>
+          <td>${esc(dr[0])}</td>
+          <td class="r">${fmtBaht(dr[1])}</td>
         </tr>`;
       }
 
       return `<div class="slip">
         <div class="slip-head">
-          <div><h2>ใบแจ้งเงินเดือน / Pay Slip</h2><div class="sub">${esc(periodTitle || ymLabel($('monthPicker').value))}</div></div>
-          <div style="text-align:right;"><b>โฮมสตีล เซ็นเตอร์ สาขาขอนแก่น</b><div class="sub">CONFIDENTIAL / ลับเฉพาะ</div></div>
+          <div>
+            <h2>ใบแจ้งเงินเดือน / Pay Slip</h2>
+            <div class="period">เดือน ${esc(periodTitle || monthTh)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="comp">โฮมสตีล เซ็นเตอร์ สาขาขอนแก่น</div>
+            <div class="conf">CONFIDENTIAL / ลับเฉพาะ</div>
+          </div>
         </div>
-        <div class="slip-meta">
-          <div><b>รหัสพนักงาน:</b> ${esc(e.code)}</div><div><b>ตำแหน่ง:</b> ${esc(e.position || '-')}</div>
-          <div><b>ชื่อ-สกุล:</b> ${esc(e.name)} ${esc(e.nickname ? '(' + e.nickname + ')' : '')}</div><div><b>วันที่เริ่มงาน:</b> ${esc(e.hire_date || '-')}</div>
-          <div><b>ธนาคาร:</b> ${esc(e.bank || '-')} ${esc(e.bank_account || '')}</div><div><b>ฐานเงินเดือน:</b> ${fmtBaht(e.base_salary)} บาท</div>
-        </div>
+
+        <table class="info-tbl">
+          <tr>
+            <td class="lbl">รหัสพนักงาน</td><td class="val">${esc(e.code)}</td>
+            <td class="lbl">วันที่เริ่มงาน</td><td class="val">${esc(e.hire_date || '-')}</td>
+          </tr>
+          <tr>
+            <td class="lbl">ชื่อ-สกุล</td><td class="val"><b>${esc(e.name)}</b></td>
+            <td class="lbl">ช่วงเวลาคำนวณ</td><td class="val">${esc(calcRange)}</td>
+          </tr>
+          <tr>
+            <td class="lbl">ชื่อเล่น</td><td class="val">${esc(e.nickname || '-')}</td>
+            <td class="lbl">วันที่จ่าย</td><td class="val">${esc(payDate)}</td>
+          </tr>
+          <tr>
+            <td class="lbl">ธนาคาร</td><td class="val">${esc(e.bank || '-')}</td>
+            <td class="lbl">ตำแหน่ง</td><td class="val">${esc(e.position || '-')}</td>
+          </tr>
+          <tr>
+            <td class="lbl">เลขที่บัญชี</td><td class="val">${esc(e.bank_account || '-')}</td>
+            <td class="lbl">ฐานเงินเดือน</td><td class="val"><b>${fmtBaht(e.base_salary)}</b></td>
+          </tr>
+        </table>
+
         <table class="slip-tbl">
-          <thead><tr><th>รายได้ / Earning</th><th class="r">จำนวนเงิน</th><th>รายการหัก / Deduction</th><th class="r">จำนวนเงิน</th></tr></thead>
+          <thead>
+            <tr>
+              <th colspan="3" class="sec-h">รายได้ / Earning</th>
+              <th colspan="2" class="sec-h">รายการหัก / Deduction</th>
+            </tr>
+            <tr>
+              <th style="width:27%;">รายการ</th>
+              <th class="c" style="width:10%;">ชั่วโมง</th>
+              <th class="r" style="width:13%;">บาท</th>
+              <th style="width:36%;">รายการ</th>
+              <th class="r" style="width:14%;">บาท</th>
+            </tr>
+          </thead>
           <tbody>${rowsHtml}</tbody>
           <tfoot>
-            <tr><th>รวมรายได้</th><th class="r">${fmtBaht(sumEarn)}</th><th>รวมรายการหัก</th><th class="r">${fmtBaht(sumDed)}</th></tr>
+            <tr class="tot-row">
+              <th colspan="2">รวมรายได้</th><th class="r">${fmtBaht(sumEarn)}</th>
+              <th>รวมรายการหัก</th><th class="r">${fmtBaht(sumDed)}</th>
+            </tr>
           </tfoot>
         </table>
-        <div class="slip-net">ยอดจ่ายเงินสุทธิ / Net Pay: <b>${fmtBaht(e.net_pay)} บาท</b></div>
+
+        <table class="net-tbl">
+          <tr>
+            <td style="width:50%;"><b>รายได้สุทธิ</b></td>
+            <td class="r">${fmtBaht(netBeforeRound)}</td>
+          </tr>
+          <tr class="pay-row">
+            <td><b>จ่ายเงินจริง</b></td>
+            <td class="r"><b>${fmtBaht(e.net_pay)} บาท</b></td>
+          </tr>
+        </table>
+
+        <div class="add-info">
+          <div class="add-title">ข้อมูลเพิ่มเติม / Additional Information</div>
+          <div>เรียนท่านผู้เกี่ยวข้อง</div>
+          <div>เอกสารฉบับนี้เป็นสำเนาจากระบบอิเล็กทรอนิคส์ ออกโดย บริษัท โฮมสตีล เซ็นเตอร์ จำกัด ซึ่งพนักงานสามารถใช้สำเนาฉบับนี้ที่มีตราประทับของบริษัทพร้อมลายเซ็นของผู้จัดการเพื่อใช้แทนหนังสือรับรองการทำงานและหนังสือรับรองเงินเดือนได้</div>
+        </div>
+
+        <div class="ytd-grid">
+          <table class="mini-tbl">
+            <thead>
+              <tr><th colspan="2">Employer Contribution / เงินสมทบสะสม</th></tr>
+              <tr><th>ประเภทเงิน</th><th class="r">จำนวนเงินรวม</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>มัดจำยูนิฟอร์ม</td><td class="r">${fmtBaht(Math.abs(e.deduct_uniform || 0))}</td></tr>
+              <tr><td>กองทุนสำรองเลี้ยงชีพ</td><td class="r">${fmtBaht(Math.abs(e.deduct_pvd || 0))}</td></tr>
+            </tbody>
+          </table>
+          <table class="mini-tbl">
+            <thead>
+              <tr><th colspan="2">Year to Date / เงินสะสมประจำปี</th></tr>
+              <tr><th>ประเภทเงิน</th><th class="r">จำนวนเงินรวม</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>รายได้สะสม (งวดนี้)</td><td class="r">${fmtBaht(e.net_pay)}</td></tr>
+              <tr><td>ภาษีสะสม (งวดนี้)</td><td class="r">${fmtBaht(e.tax || 0)}</td></tr>
+              <tr><td>ประกันสังคมสะสม (งวดนี้)</td><td class="r">${fmtBaht(e.sso || 0)}</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>`;
     }
 
     function openPrintWindow(slipsHtml, title) {
-      const w = window.open('', '_blank', 'width=900,height=700');
+      const w = window.open('', '_blank', 'width=920,height=780');
       if (!w) { toast('เบราว์เซอร์บล็อกหน้าต่างป๊อปอัพ กรุณาอนุญาต Pop-up เพื่อพิมพ์สลิปครับ', 'error'); return; }
       w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>${esc(title)}</title>
         <style>
-          body { font-family: 'Segoe UI', Tahoma, sans-serif; color: #111; margin: 0; padding: 16px; background: #fff; }
-          .slip { border: 1.5px solid #334155; border-radius: 10px; padding: 18px 20px; margin-bottom: 24px; page-break-after: always; }
+          @page { size: A4 portrait; margin: 12mm; }
+          body { font-family: 'Sarabun', 'Segoe UI', Tahoma, sans-serif; color: #111; margin: 0; padding: 14px; background: #fff; font-size: 12.5px; }
+          .slip { border: 1.5px solid #1e293b; padding: 16px 18px; margin-bottom: 24px; page-break-after: always; }
           .slip:last-child { page-break-after: auto; }
-          .slip-head { display: flex; justify-content: space-between; border-bottom: 2px solid #1e3a8a; padding-bottom: 8px; margin-bottom: 12px; }
+          .slip-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1e3a8a; padding-bottom: 8px; margin-bottom: 10px; }
           .slip-head h2 { margin: 0; font-size: 18px; color: #1e3a8a; }
-          .sub { font-size: 12px; color: #475569; }
-          .slip-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; font-size: 13px; margin-bottom: 12px; }
-          .slip-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-          .slip-tbl th, .slip-tbl td { border: 1px solid #cbd5e1; padding: 6px 8px; }
-          .slip-tbl th { background: #f1f5f9; text-align: left; }
+          .period { font-size: 13px; font-weight: 600; margin-top: 2px; }
+          .comp { font-size: 15px; font-weight: 700; color: #0f172a; }
+          .conf { font-size: 11px; font-weight: 700; color: #b91c1c; margin-top: 3px; }
+          .info-tbl { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 12px; }
+          .info-tbl td { padding: 3px 6px; border-bottom: 1px solid #e2e8f0; }
+          .info-tbl .lbl { color: #475569; width: 16%; font-weight: 600; background: #f8fafc; }
+          .info-tbl .val { width: 34%; }
+          .slip-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+          .slip-tbl th, .slip-tbl td { border: 1px solid #94a3b8; padding: 4px 7px; }
+          .slip-tbl .sec-h { background: #1e3a8a; color: #fff; text-align: center; font-size: 12.5px; }
+          .slip-tbl thead tr:nth-child(2) th { background: #e2e8f0; }
+          .tot-row th { background: #f1f5f9; font-weight: 700; }
+          .c { text-align: center; }
           .r { text-align: right; font-variant-numeric: tabular-nums; }
-          .slip-net { margin-top: 12px; text-align: right; font-size: 16px; background: #eff6ff; padding: 10px 14px; border-radius: 8px; color: #1e3a8a; }
+          .net-tbl { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+          .net-tbl td { border: 1px solid #94a3b8; padding: 6px 10px; }
+          .pay-row td { background: #dbeafe; color: #1e3a8a; font-size: 15px; }
+          .add-info { margin-top: 10px; border: 1px solid #cbd5e1; padding: 8px 10px; font-size: 11.5px; line-height: 1.5; background: #f8fafc; }
+          .add-title { font-weight: 700; margin-bottom: 3px; color: #1e3a8a; }
+          .ytd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+          .mini-tbl { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+          .mini-tbl th, .mini-tbl td { border: 1px solid #94a3b8; padding: 4px 7px; }
+          .mini-tbl thead tr:first-child th { background: #e2e8f0; text-align: left; }
+          .mini-tbl thead tr:nth-child(2) th { background: #f8fafc; }
           @media print { body { padding: 0; } .no-print { display: none; } }
         </style></head><body>
         <div class="no-print" style="margin-bottom:14px; text-align:right;">
