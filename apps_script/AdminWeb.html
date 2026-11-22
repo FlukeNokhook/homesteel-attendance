@@ -290,7 +290,6 @@
               <div id="payrollSub" class="card-sub">กรอกข้อมูลได้ทั้งใน Google Sheet และบนหน้านี้ ซิงก์กันทันที</div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button id="cleanPayrollBtn" class="btn btn-soft-red btn-sm hidden" onclick="runCleanPayroll()">✨ จัดโครงสร้าง Calculation ใหม่ & ลบชีตที่ไม่ใช้</button>
               <button class="btn btn-primary btn-sm" onclick="syncToPayrollSheet()">📤 ส่งข้อมูลเข้า Calculation + Time Clock</button>
               <button class="btn btn-ghost btn-sm" onclick="loadPayroll()">🔄 โหลดยอดล่าสุด</button>
               <a id="openPayrollSheetLink" href="#" target="_blank" class="btn btn-soft-blue btn-sm hidden">📄 เปิด Google Sheet เงินเดือน</a>
@@ -815,10 +814,7 @@
           $('openPayrollSheetLink').href = res.sheetUrl;
           $('openPayrollSheetLink').classList.remove('hidden');
         }
-        $('cleanPayrollBtn').classList.toggle('hidden', !!res.isCleanLayout);
-        $('payrollSub').textContent = res.isCleanLayout
-          ? 'โครงสร้าง Calculation แบบใหม่ (33 คอลัมน์) • เชื่อมข้อมูลตรงจากระบบลงเวลา + สูตรค่าคอมฯ/ค่าหาโครง/ประกันสังคม'
-          : (res.periodTitle ? res.periodTitle + ' • ' : '') + 'ยังใช้โครงสร้างเก่า — กดปุ่ม "✨ จัดโครงสร้าง Calculation ใหม่" เพื่อเคลียร์ชีตให้เรียบง่ายขึ้นได้เลย';
+        $('payrollSub').textContent = 'โครงสร้าง Calculation (33 คอลัมน์) • เชื่อมข้อมูลตรงจากระบบลงเวลา + สูตรค่าคอมฯ/ค่าหาโครง/ประกันสังคม';
 
         const emps = res.employees || [];
         const sumNet = emps.reduce((s, e) => s + Number(e.net_pay || 0), 0);
@@ -862,21 +858,6 @@
         $('payrollStats').innerHTML = '';
         $('payrollTableWrap').innerHTML = `<div class="callout warn"><span>⚠️</span><div>${esc(err.message)}</div></div>`;
       }
-    }
-
-    async function runCleanPayroll() {
-      const ok = await modal({
-        title: '✨ จัดโครงสร้าง Calculation ใหม่ & ลบชีตที่ไม่ได้ใช้?',
-        body: 'ระบบจะสำรองชีต Calculation เดิมไว้เป็น Calculation_Backup, สร้างชีต Calculation ใหม่แบบเรียบง่าย (33 คอลัมน์) พร้อมดึงฐานเงินเดือนเดิมมาให้ และลบชีตที่ไม่ได้ใช้ (Sheet1, Sheet2, Attendant, เบี้ยขยันฯ) ออก โดยยังคง Time Clock ไว้ตรวจเทียบครับ',
-        confirmText: '✨ จัดระเบียบเลย',
-        confirmClass: 'btn-primary'
-      });
-      if (!ok) return;
-      try {
-        const res = await call('adminSetupCleanPayroll');
-        toast(`สร้าง Calculation ใหม่ (${res.employeesAdded} คน) และลบชีตที่ไม่ใช้ (${res.deletedTabs.join(', ') || 'ไม่มี'}) เรียบร้อย`, 'success');
-        loadPayroll();
-      } catch (err) { toast(err.message, 'error'); }
     }
 
     async function syncToPayrollSheet() {
