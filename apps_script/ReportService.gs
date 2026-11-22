@@ -267,7 +267,9 @@ function computeDayMetrics(emp, dateStr, scanIn, scanOut, dayScansCount, dayLeav
 
   const status = existingManualStatus === 'CORRECTED'
     ? 'CORRECTED'
-    : (flags.length ? 'EXCEPTION' : (absentMin > 0 ? 'ABSENT' : (offDay && !scanIn ? 'OFF' : 'NORMAL')));
+    : (existingManualStatus === 'RESOLVED'
+      ? 'RESOLVED'
+      : (flags.length ? 'EXCEPTION' : (absentMin > 0 ? 'ABSENT' : (offDay && !scanIn ? 'OFF' : 'NORMAL'))));
 
   return {
     work_date: dateStr,
@@ -310,12 +312,13 @@ function recomputeDailyForMonth(yearMonth) {
   const holidaySet = repoGetHolidaySet();
   const today = todayStr();
 
-  // คงค่าที่ Admin เคยแก้เวลาไว้เอง (status === 'CORRECTED') เพื่อไม่ให้การกดคำนวณใหม่ไปลบการแก้ของ Admin
+  // คงค่าที่ Admin เคยแก้เวลาไว้เอง (CORRECTED) หรือกดตรวจแล้ว (RESOLVED)
   const existingDaily = repoReadAll(SHEETS.ATTENDANCE_DAILY).rows;
-  const correctedMap = {};
+  const preservedMap = {};
   existingDaily.forEach(r => {
-    if (String(r.work_date).indexOf(yearMonth) === 0 && String(r.status) === 'CORRECTED') {
-      correctedMap[String(r.employee_id) + '|' + String(r.work_date)] = r;
+    const st = String(r.status);
+    if (String(r.work_date).indexOf(yearMonth) === 0 && (st === 'CORRECTED' || st === 'RESOLVED')) {
+      preservedMap[String(r.employee_id) + '|' + String(r.work_date)] = r;
     }
   });
 
@@ -346,16 +349,17 @@ function recomputeDailyForMonth(yearMonth) {
         .sort()
         .filter((t, i, arr) => i === 0 || parseHmToMinutes(t) - parseHmToMinutes(arr[i - 1]) > 2);
 
-      const corr = correctedMap[empId + '|' + dateStr];
-      const scanIn = corr ? String(corr.first_in || '') : (dayScans.length > 0 ? dayScans[0] : '');
-      const scanOut = corr ? String(corr.last_out || '') : (dayScans.length > 1 ? dayScans[dayScans.length - 1] : '');
-      const scanCount = corr ? ((scanIn ? 1 : 0) + (scanOut ? 1 : 0)) : dayScans.length;
+      const prev = preservedMap[empId + '|' + dateStr];
+      const isCorrected = prev && String(prev.status) === 'CORRECTED';
+      const scanIn = isCorrected ? String(prev.first_in || '') : (dayScans.length > 0 ? dayScans[0] : '');
+      const scanOut = isCorrected ? String(prev.last_out || '') : (dayScans.length > 1 ? dayScans[dayScans.length - 1] : '');
+      const scanCount = isCorrected ? ((scanIn ? 1 : 0) + (scanOut ? 1 : 0)) : dayScans.length;
 
       const dayLeaves = leaves.filter(l => String(l.employee_id) === empId && dateStr >= String(l.start_date) && dateStr <= String(l.end_date));
       const dayOTs = ots.filter(o => String(o.employee_id) === empId && String(o.ot_date) === dateStr);
 
       const obj = computeDayMetrics(emp, dateStr, scanIn, scanOut, scanCount, dayLeaves, dayOTs, offDay, isFuture, settings,
-        corr ? corr.admin_note : '', corr ? 'CORRECTED' : '');
+        prev ? prev.admin_note : '', prev ? String(prev.status) : '');
       newRows.push(headers.map(h => obj[h]));
     }
   });
@@ -493,8 +497,9 @@ function getMonthOverview(yearMonth) {
 
   const exceptions = [];
 
-  // 1. เคสจาก Attendance_Daily (สแกนไม่ครบ, ขาดงาน, ทำงานสั้นผิดปกติ, OT ไม่ตรงสแกน, ลาชนกับสแกนนิ้ว)
+  // 1. เคสจาก Attendance_Daily (ข้ามแถวที่กด "ตรวจแล้ว" RESOLVED)
   dailyRows.forEach(r => {
+    if (String(r.status).toUpperCase() === 'RESOLVED') return;
     const flags = String(r.flags || '').split(',').filter(Boolean);
     if (flags.length || Number(r.absent_min) > 0) {
       const code = flags[0] || 'ABSENT';
@@ -508,6 +513,7 @@ function getMonthOverview(yearMonth) {
       };
       exceptions.push({
         kind: 'DAILY',
+        target_id: r.employee_id + '|' + r.work_date,
         work_date: r.work_date,
         employee_id: r.employee_id,
         name: r.name,
@@ -523,6 +529,7 @@ function getMonthOverview(yearMonth) {
   missed.forEach(m => {
     exceptions.push({
       kind: 'MISSED_SCAN',
+      target_id: m.report_id,
       work_date: m.work_date,
       employee_id: m.employee_id,
       name: m.name,
@@ -533,28 +540,30 @@ function getMonthOverview(yearMonth) {
     });
   });
 
-  // 3. เคสจากกฎการลา (WAITING_MEDICAL_CERT, LIMIT_EXCEEDED, LATE_NOTICE, PENDING vacation)
+  // 3. เคสจากกฎการลา (ข้าม Flag ที่กดตรวจแล้ว REVIEWED แต่ยังแสดง PENDING_VACATION)
   leaves.forEach(l => {
-    const flags = String(l.flags || '').split(',').filter(Boolean);
-    if (String(l.status).toUpperCase() === 'PENDING') flags.unshift('PENDING_VACATION');
-    if (flags.length) {
+    const rawFlags = String(l.flags || '').split(',').map(f => f.trim()).filter(f => f && f !== 'REVIEWED');
+    if (String(l.status).toUpperCase() === 'PENDING') rawFlags.unshift('PENDING_VACATION');
+    if (rawFlags.length) {
       const map = {
         PENDING_VACATION: 'ใบลาพักร้อนรออนุมัติ',
         WAITING_MEDICAL_CERT: 'รอใบรับรองแพทย์',
         SICK_LIMIT_EXCEEDED: 'ลาป่วยเกินโควตาปี',
         PERSONAL_LIMIT_EXCEEDED: 'ลากิจเกินโควตาปี',
         LATE_NOTICE: 'แจ้งลาช้ากว่ากำหนด',
-        CONSECUTIVE_LEAVE_3PLUS: 'ลาต่อเนื่องตั้งแต่ 3 วันขึ้นไป'
+        CONSECUTIVE_LEAVE_3PLUS: 'ลาต่อเนื่องตั้งแต่ 3 วันขึ้นไป',
+        SAME_DAY_MULTI_LEAVE: 'มีใบลาหลายรายการในวันเดียวกัน'
       };
       exceptions.push({
         kind: 'LEAVE',
+        target_id: l.request_id,
         work_date: l.start_date,
         employee_id: l.employee_id,
         name: l.name,
         first_in: '',
         last_out: '',
-        code: flags[0],
-        detail: l.leave_type + ' • ' + flags.map(f => map[f] || f).join(' • ')
+        code: rawFlags[0],
+        detail: l.leave_type + ' • ' + rawFlags.map(f => map[f] || f).join(' • ')
       });
     }
   });
@@ -563,6 +572,7 @@ function getMonthOverview(yearMonth) {
   ots.filter(o => String(o.status).toUpperCase() === 'PENDING').forEach(o => {
     exceptions.push({
       kind: 'OT',
+      target_id: o.request_id,
       work_date: o.ot_date,
       employee_id: o.employee_id,
       name: o.name,
@@ -588,6 +598,41 @@ function getMonthOverview(yearMonth) {
     },
     exceptions: exceptions.slice(0, 300)
   };
+}
+
+/**
+ * กด "ตรวจแล้ว" เพื่อปิดเคสใน Exception List และบันทึก Audit Log
+ */
+function resolveExceptionItem(kind, targetId, workDate, employeeId, actor) {
+  if (kind === 'DAILY') {
+    const { rows } = repoReadAll(SHEETS.ATTENDANCE_DAILY);
+    const target = rows.find(r => String(r.employee_id) === String(employeeId) && String(r.work_date) === String(workDate));
+    if (!target) throw new Error('ไม่พบข้อมูลรายวันที่ระบุครับ');
+    const note = target.admin_note ? (target.admin_note + ' [ตรวจแล้ว]') : 'ตรวจแล้ว';
+    repoUpdateRow(SHEETS.ATTENDANCE_DAILY, target._rowIndex, { status: 'RESOLVED', admin_note: note, updated_at: nowStr() });
+    repoAppendAuditLog(actor || 'admin', 'RESOLVE_EXCEPTION', SHEETS.ATTENDANCE_DAILY, targetId,
+      { status: target.status, flags: target.flags }, { status: 'RESOLVED' }, 'แอดมินกดตรวจแล้ว');
+    return { ok: true };
+  }
+  if (kind === 'MISSED_SCAN') {
+    const { rows } = repoReadAll(SHEETS.MISSED_SCAN);
+    const target = rows.find(r => String(r.report_id) === String(targetId));
+    if (!target) throw new Error('ไม่พบรายการแจ้งลืมสแกนครับ');
+    repoUpdateRow(SHEETS.MISSED_SCAN, target._rowIndex, { status: 'RESOLVED', resolved_by: actor || 'admin', resolved_at: nowStr() });
+    repoAppendAuditLog(actor || 'admin', 'RESOLVE_EXCEPTION', SHEETS.MISSED_SCAN, targetId,
+      { status: target.status }, { status: 'RESOLVED' }, 'แอดมินกดตรวจแล้ว');
+    return { ok: true };
+  }
+  if (kind === 'LEAVE') {
+    const { rows } = repoReadAll(SHEETS.LEAVE);
+    const target = rows.find(r => String(r.request_id) === String(targetId));
+    if (!target) throw new Error('ไม่พบใบลาที่ระบุครับ');
+    repoUpdateRow(SHEETS.LEAVE, target._rowIndex, { flags: 'REVIEWED' });
+    repoAppendAuditLog(actor || 'admin', 'RESOLVE_EXCEPTION', SHEETS.LEAVE, targetId,
+      { flags: target.flags }, { flags: 'REVIEWED' }, 'แอดมินกดตรวจ Flag ใบลาแล้ว');
+    return { ok: true };
+  }
+  throw new Error('ไม่สามารถปิดเคสประเภทนี้ได้โดยตรง (กรุณาไปกดอนุมัติ/ไม่อนุมัติในแท็บ อนุมัติ / รับทราบ)');
 }
 
 function getIndividualTimesheet(employeeId, yearMonth) {

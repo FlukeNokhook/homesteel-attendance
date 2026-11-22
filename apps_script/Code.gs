@@ -182,6 +182,11 @@ function adminCorrectAttendance(adminSecret, workDate, employeeId, firstIn, last
   return withScriptLock(() => adminCorrectDaily(workDate, employeeId, firstIn, lastOut, adminNote, reason, 'ADMIN'));
 }
 
+function adminResolveException(adminSecret, kind, targetId, workDate, employeeId) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => resolveExceptionItem(kind, targetId, workDate, employeeId, 'ADMIN'));
+}
+
 function adminRecomputeMonth(adminSecret, yearMonth) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => recomputeDailyForMonth(yearMonth));

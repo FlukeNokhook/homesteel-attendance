@@ -497,12 +497,21 @@
             <td class="note">${esc(r.detail)}</td>
             <td style="white-space:nowrap;">
               ${(r.kind === 'DAILY' || r.kind === 'MISSED_SCAN') ? `<button class="btn btn-soft-blue btn-sm" onclick="openCorrectModal('${esc(r.work_date)}','${esc(r.employee_id)}','${esc(r.name)}','${esc(r.first_in)}','${esc(r.last_out)}')">✏️ แก้เวลา</button>` : ''}
+              ${(r.code !== 'PENDING_VACATION' && r.code !== 'PENDING_OT') ? `<button class="btn btn-soft-green btn-sm" onclick="resolveExc('${esc(r.kind)}','${esc(r.target_id)}','${esc(r.work_date)}','${esc(r.employee_id)}')">✓ ตรวจแล้ว</button>` : ''}
               <button class="btn btn-ghost btn-sm" onclick="openPerson('${esc(r.employee_id)}')">ดูรายคน</button>
             </td>
           </tr>`).join('')}</tbody></table></div>`;
     }
 
     function openPerson(empId) { $('empSelect').value = empId; switchTab('person'); }
+
+    async function resolveExc(kind, targetId, workDate, empId) {
+      try {
+        await call('adminResolveException', kind, targetId, workDate, empId);
+        toast('ปิดเคสเรียบร้อยแล้ว (บันทึกใน Audit Log)', 'success');
+        loadInit();
+      } catch (err) { toast(err.message, 'error'); }
+    }
 
     function renderEmpSelect() {
       const sel = $('empSelect'), prev = sel.value;
