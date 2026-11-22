@@ -183,7 +183,7 @@ function decideOT(requestId, isApproved, actorId, rejectReason, options) {
     updates.reject_reason
   );
 
-  // อัปเดต Attendance_Daily อัตโนมัติหลังอนุมัติ
-  if (isApproved) safeAutoRecompute(target.ot_date);
+  // อัปเดต Attendance_Daily เฉพาะวันและพนักงานคนนี้ (เร็วกว่าคำนวณใหม่ทั้งเดือน)
+  if (isApproved) safeRecomputeEmployeeDates(target.employee_id, target.ot_date, target.ot_date);
   return Object.assign({}, target, updates);
 }

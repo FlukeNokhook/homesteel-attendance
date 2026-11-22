@@ -50,6 +50,15 @@ function verifyLineIdToken(idToken) {
     throw new Error('ระบบยังไม่ได้ตั้งค่า LINE_CHANNEL_ID กรุณาแจ้งผู้ดูแลระบบครับ');
   }
 
+  // แคชผลตรวจ ID Token ไว้ 5 นาที ช่วยให้การกดปุ่มใน LIFF เร็วขึ้นมาก
+  const cache = CacheService.getScriptCache();
+  const digest = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, idToken)).slice(0, 40);
+  const cacheKey = 'line_tok_' + digest;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (_) {}
+  }
+
   const res = UrlFetchApp.fetch('https://api.line.me/oauth2/v2.1/verify', {
     method: 'post',
     payload: { id_token: idToken, client_id: cfg.LINE_CHANNEL_ID },
@@ -63,7 +72,9 @@ function verifyLineIdToken(idToken) {
     throw err;
   }
 
-  return { lineUserId: body.sub, name: body.name || '', picture: body.picture || '' };
+  const result = { lineUserId: body.sub, name: body.name || '', picture: body.picture || '' };
+  try { cache.put(cacheKey, JSON.stringify(result), 300); } catch (_) {}
+  return result;
 }
 
 function verifyAdminSecret(secret) {

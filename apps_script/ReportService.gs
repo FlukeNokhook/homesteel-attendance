@@ -378,6 +378,49 @@ function recomputeDailyForMonth(yearMonth) {
 /**
  * เรียกคำนวณรายวันอัตโนมัติหลังอนุมัติ/รับทราบ โดยไม่ทำให้การอนุมัติล้มเหลวหากงวดถูกล็อก
  */
+/**
+ * อัปเดต Attendance_Daily เฉพาะพนักงานและวันที่ได้รับผลกระทบ (เร็วกว่าคำนวณทั้งเดือนมาก)
+ * ใช้หลังกดอนุมัติ/รับทราบใน LIFF และ Admin เพื่อไม่ให้หน่วงเวลาตอบกลับ
+ */
+function safeRecomputeEmployeeDates(employeeId, startDate, endDate) {
+  try {
+    const emp = repoFindEmployeeById(employeeId);
+    if (!emp) return;
+    const sDate = String(startDate || '').trim();
+    const eDate = String(endDate || sDate).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(sDate)) return;
+
+    const settings = repoGetSettings();
+    const holidaySet = repoGetHolidaySet();
+    const today = todayStr();
+    const dailyData = repoReadAll(SHEETS.ATTENDANCE_DAILY).rows;
+    const empLeaves = repoReadAll(SHEETS.LEAVE).rows.filter(l => isEffectiveLeave(l) && String(l.employee_id) === String(emp.employee_id));
+    const empOTs = repoReadAll(SHEETS.OT).rows.filter(o => String(o.status).toUpperCase() === 'APPROVED' && String(o.employee_id) === String(emp.employee_id));
+
+    const d = new Date(sDate + 'T00:00:00+07:00');
+    const end = new Date(eDate + 'T00:00:00+07:00');
+    let guard = 0;
+    while (d <= end && guard < 14) {
+      const dateStr = Utilities.formatDate(d, TIMEZONE, 'yyyy-MM-dd');
+      const existing = dailyData.find(r => String(r.employee_id) === String(emp.employee_id) && String(r.work_date) === dateStr);
+      if (existing) {
+        const scanIn = String(existing.first_in || '');
+        const scanOut = String(existing.last_out || '');
+        const scanCount = (scanIn ? 1 : 0) + (scanOut ? 1 : 0);
+        const dayLeaves = empLeaves.filter(l => dateStr >= String(l.start_date) && dateStr <= String(l.end_date || l.start_date));
+        const dayOTs = empOTs.filter(o => String(o.ot_date) === dateStr);
+        const computed = computeDayMetrics(emp, dateStr, scanIn, scanOut, scanCount, dayLeaves, dayOTs,
+          isOffDay(dateStr, holidaySet), dateStr > today, settings, existing.admin_note, existing.status === 'CORRECTED' ? 'CORRECTED' : '');
+        repoUpdateRow(SHEETS.ATTENDANCE_DAILY, existing._rowIndex, computed);
+      }
+      d.setDate(d.getDate() + 1);
+      guard++;
+    }
+  } catch (e) {
+    Logger.log('safeRecomputeEmployeeDates skip: ' + e.message);
+  }
+}
+
 function safeAutoRecompute(dateStr) {
   try {
     const ym = String(dateStr || '').slice(0, 7);

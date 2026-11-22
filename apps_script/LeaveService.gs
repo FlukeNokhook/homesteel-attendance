@@ -204,10 +204,40 @@ function submitLeaveRequest(emp, payload) {
   }
 
   const allLeaves = repoReadAll(SHEETS.LEAVE).rows;
+
+  // ตรวจสอบใบลาซ้ำซ้อนในวันเดียวกัน (ห้ามรวมกันเกินชั่วโมงทำงานต่อวัน เช่น 8 ชม.)
+  const newDayHours = durationMode === 'HOURS' ? hours : workHoursPerDay;
+  let hasSameDayOtherLeave = false;
+  {
+    const d = new Date(startDate + 'T00:00:00+07:00');
+    const e = new Date(endDate + 'T00:00:00+07:00');
+    let guard = 0;
+    while (d <= e && guard < 60) {
+      const ds = Utilities.formatDate(d, TIMEZONE, 'yyyy-MM-dd');
+      const sameDayLeaves = allLeaves.filter(r =>
+        String(r.employee_id) === String(emp.employee_id) &&
+        String(r.status).toUpperCase() !== 'REJECTED' &&
+        ds >= String(r.start_date) && ds <= String(r.end_date || r.start_date)
+      );
+      if (sameDayLeaves.length > 0) {
+        const usedHrs = sameDayLeaves.reduce((sum, r) =>
+          sum + (String(r.duration_mode) === 'HOURS' ? Number(r.hours || 0) : workHoursPerDay), 0);
+        if (usedHrs + newDayHours > workHoursPerDay) {
+          const existingText = sameDayLeaves.map(r => r.leave_type + ' (' + (r.duration_mode === 'HOURS' ? r.hours + ' ชม.' : r.days + ' วัน') + ')').join(', ');
+          throw new Error('วันที่ ' + ds + ' คุณมีใบลา ' + existingText + ' อยู่แล้ว ไม่สามารถยื่นลาซ้ำเกิน ' + workHoursPerDay + ' ชม./วันได้ครับ');
+        }
+        hasSameDayOtherLeave = true;
+      }
+      d.setDate(d.getDate() + 1);
+      guard++;
+    }
+  }
+
   const today = todayStr();
   const diffDays = daysBetween(today, startDate);
   const quotas = getLeaveQuotas(emp.employee_id, startDate, allLeaves);
   const flags = [];
+  if (hasSameDayOtherLeave) flags.push('SAME_DAY_MULTI_LEAVE');
 
   let subType = '';
   let noticeType = 'NORMAL';
@@ -425,7 +455,7 @@ function decideVacationLeave(requestId, isApproved, actorId, rejectReason) {
     { status: target.status }, updates, updates.reject_reason);
 
   notifyEmployeeDecision(target.employee_id, target.leave_type, target.start_date, isApproved, updates.reject_reason);
-  safeAutoRecompute(target.start_date);
+  safeRecomputeEmployeeDates(target.employee_id, target.start_date, target.end_date);
   return Object.assign({}, target, updates);
 }
 
@@ -455,7 +485,7 @@ function decideSickLeaveBenefit(requestId, allowBenefit, actorId, note) {
     { status: target.status }, updates, updates.reject_reason);
 
   notifyEmployeeSickDecision(target.employee_id, target.start_date, allowBenefit, updates.reject_reason);
-  safeAutoRecompute(target.start_date);
+  safeRecomputeEmployeeDates(target.employee_id, target.start_date, target.end_date);
   return Object.assign({}, target, updates);
 }
 
@@ -477,6 +507,6 @@ function acknowledgeLeave(requestId, actorId) {
     { status: target.status }, updates, 'รับทราบใบลา');
 
   notifyEmployeeAcknowledged(target.employee_id, target.leave_type, target.start_date);
-  safeAutoRecompute(target.start_date);
+  safeRecomputeEmployeeDates(target.employee_id, target.start_date, target.end_date);
   return Object.assign({}, target, updates);
 }

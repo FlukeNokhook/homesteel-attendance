@@ -365,7 +365,7 @@ function updateOtTotal() {
 }
 
 function quickOt(hours) {
-  const s = $('otStart').value || '17:30';
+  const s = $('otStart').value || '17:00';
   const [h, m] = s.split(':').map(Number);
   const total = (h * 60 + m + hours * 60) % 1440;
   $('otEnd').value = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
@@ -565,18 +565,26 @@ async function decideItem(type, id, approved) {
     reason = await sheet({ title: 'ไม่อนุมัติรายการนี้', body: 'ระบุเหตุผลสั้นๆ เพื่อแจ้งพนักงาน (ไม่บังคับ)', input: true, confirmText: 'ยืนยันไม่อนุมัติ', confirmClass: 'btn-danger' });
     if (reason === null) return;
   }
+  toast('กำลังบันทึก...');
   try {
     const res = await callApi('liff_decide', { target_type: type, target_id: id, approved, reject_reason: reason });
+    // อัปเดตรายการบนหน้าจอทันที ไม่ต้องรอโหลดใหม่ทั้งหน้า
+    if (type === 'OT') DATA.pending_ots = (DATA.pending_ots || []).filter(o => o.request_id !== id);
+    else DATA.pending_vacations = (DATA.pending_vacations || []).filter(l => l.request_id !== id);
+    renderApprovals();
     toast(res.message);
-    await loadData();
+    loadData(); // รีเฟรชเบื้องหลัง
   } catch (err) { toast(err.message, true); }
 }
 
 async function ackItem(requestId) {
+  toast('กำลังบันทึก...');
   try {
     const res = await callApi('liff_acknowledge', { request_id: requestId });
+    DATA.unack_leaves = (DATA.unack_leaves || []).filter(l => l.request_id !== requestId);
+    renderApprovals();
     toast(res.message);
-    await loadData();
+    loadData();
   } catch (err) { toast(err.message, true); }
 }
 
@@ -617,8 +625,10 @@ function openApproveOtSheet(id, name, otDate, reqStart, reqEnd, scanIn, scanOut)
         skip_scan_cap: $('liffOtOffsite').checked
       });
       root.innerHTML = '';
+      DATA.pending_ots = (DATA.pending_ots || []).filter(o => o.request_id !== id);
+      renderApprovals();
       toast(res.message);
-      await loadData();
+      loadData();
     } catch (err) {
       toast(err.message, true);
       btn.disabled = false; btn.textContent = '✓ ยืนยันอนุมัติ';
@@ -647,9 +657,12 @@ async function decideSickItem(requestId, allowBenefit) {
     });
     if (note === null) return;
   }
+  toast('กำลังบันทึก...');
   try {
     const res = await callApi('liff_decide_sick', { request_id: requestId, allow_benefit: allowBenefit, note: note });
+    DATA.unack_leaves = (DATA.unack_leaves || []).filter(l => l.request_id !== requestId);
+    renderApprovals();
     toast(res.message);
-    await loadData();
+    loadData();
   } catch (err) { toast(err.message, true); }
 }
