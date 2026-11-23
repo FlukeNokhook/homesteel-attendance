@@ -197,40 +197,87 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
   }
   tcSheet.getRange(1, 1, tcData.length, tcHeaders.length).setValues(tcData);
 
-  // 2) ส่งสรุปรายคนตรงเข้าชีต Calculation (โครงสร้างใหม่ A-AG)
+  // 2) ส่งสรุปรายคนตรงเข้าชีต Calculation (โครงสร้างใหม่ A-AG) + เพิ่มพนักงานใหม่ที่เป็น ACTIVE ให้อัตโนมัติ
   let calcUpdated = 0;
+  let calcAdded = 0;
   const calcSheet = payrollSs.getSheetByName('Calculation');
-  if (calcSheet && calcSheet.getLastRow() >= 2 && String(calcSheet.getRange(1, 7).getValue()).indexOf('วันมาทำงาน') !== -1) {
-    const lastRow = calcSheet.getLastRow();
-    const codes = calcSheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    const statsGrid = calcSheet.getRange(2, 7, lastRow - 1, 5).getValues(); // G-K
-    const diligenceCol = calcSheet.getRange(2, 16, lastRow - 1, 1).getValues(); // P
-
-    for (let i = 0; i < codes.length; i++) {
-      const code = String(codes[i][0] || '').trim();
-      const st = byEmp[code];
-      if (!st) continue;
-      statsGrid[i] = [
-        st.workDays,
-        round2(st.workMin / 60),
-        round2(st.otHours),
-        Math.round(st.lateMin),
-        round2(st.absentMin / 60)
-      ];
-      // เบี้ยขยันเบื้องต้น: ถ้าไม่สาย ไม่ขาด ไม่ลาเลย และยังเป็น 0 -> ตั้งขั้น 1 (500); ถ้าผิดเงื่อนไข -> 0
-      const eligible = (st.lateMin === 0 && st.absentMin === 0 && st.leaveHours === 0 && st.workDays > 0);
-      if (!eligible) diligenceCol[i][0] = 0;
-      else if (!Number(diligenceCol[i][0])) diligenceCol[i][0] = 500;
-      calcUpdated++;
+  if (calcSheet && calcSheet.getLastRow() >= 1 && String(calcSheet.getRange(1, 7).getValue()).indexOf('วันมาทำงาน') !== -1) {
+    // ตรวจหาพนักงาน ACTIVE ที่ยังไม่มีใน Calculation แล้วเพิ่มแถวพร้อมสูตรให้อัตโนมัติ
+    const existingCodes = new Set();
+    if (calcSheet.getLastRow() >= 2) {
+      calcSheet.getRange(2, 1, calcSheet.getLastRow() - 1, 1).getValues().forEach(c => {
+        const k = String(c[0] || '').trim();
+        if (k) existingCodes.add(k);
+      });
     }
-    calcSheet.getRange(2, 7, lastRow - 1, 5).setValues(statsGrid);
-    calcSheet.getRange(2, 16, lastRow - 1, 1).setValues(diligenceCol);
+    const activeEmps = repoGetEmployees().filter(isActiveEmp);
+    const missingEmps = activeEmps.filter(e => !existingCodes.has(String(e.code || e.employee_id).trim()));
+    if (missingEmps.length) {
+      const startRow = calcSheet.getLastRow() + 1;
+      const newRows = missingEmps.map((e, idx) => {
+        const r = startRow + idx;
+        return [
+          e.code || e.employee_id, e.name || '', e.nickname || '', e.position || '', e.hire_date || '', 0,
+          0, 0, 0, 0, 0,
+          `=ROUND(I${r}*(F${r}/240)*1.5, 2)`,
+          `=IFERROR(VLOOKUP(C${r}, 'ค่าคอมฯ'!X:AA, 4, 0), 0)`,
+          0,
+          `=IFERROR(SUMIF('ค่าหาโครง'!B:B, C${r}, 'ค่าหาโครง'!F:F), 0)`,
+          0, 0, 0,
+          `=ROUND(-K${r}*(F${r}/240), 2)`,
+          `=ROUND(-(J${r}/60)*(F${r}/240), 2)`,
+          0,
+          `=ROUND(-F${r}*U${r}, 2)`,
+          0, 0, 0, 0, 0,
+          `=ROUND(F${r}+SUM(L${r}:T${r})+SUM(V${r}:AA${r}), 0)`,
+          `=IF(F${r}<100, 0, -ROUND(MIN(F${r}*0.05, 875), 0))`,
+          0,
+          `=ROUNDUP(AB${r}+AC${r}+AD${r}, 0)`,
+          '', ''
+        ];
+      });
+      if (startRow + newRows.length - 1 > calcSheet.getMaxRows()) {
+        calcSheet.insertRowsAfter(calcSheet.getMaxRows(), newRows.length);
+      }
+      calcSheet.getRange(startRow, 1, newRows.length, CLEAN_CALC_HEADERS.length).setValues(newRows);
+      calcSheet.getRange(startRow, 6, newRows.length, 1).setNumberFormat('#,##0.00');
+      calcSheet.getRange(startRow, 12, newRows.length, 9).setNumberFormat('#,##0.00');
+      calcSheet.getRange(startRow, 21, newRows.length, 1).setNumberFormat('0.0%');
+      calcSheet.getRange(startRow, 22, newRows.length, 10).setNumberFormat('#,##0.00');
+      calcAdded = newRows.length;
+    }
+
+    const lastRow = calcSheet.getLastRow();
+    if (lastRow >= 2) {
+      const codes = calcSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      const statsGrid = calcSheet.getRange(2, 7, lastRow - 1, 5).getValues(); // G-K
+      const diligenceCol = calcSheet.getRange(2, 16, lastRow - 1, 1).getValues(); // P
+
+      for (let i = 0; i < codes.length; i++) {
+        const code = String(codes[i][0] || '').trim();
+        const st = byEmp[code];
+        if (!st) continue;
+        statsGrid[i] = [
+          st.workDays,
+          round2(st.workMin / 60),
+          round2(st.otHours),
+          Math.round(st.lateMin),
+          round2(st.absentMin / 60)
+        ];
+        const eligible = (st.lateMin === 0 && st.absentMin === 0 && st.leaveHours === 0 && st.workDays > 0);
+        if (!eligible) diligenceCol[i][0] = 0;
+        else if (!Number(diligenceCol[i][0])) diligenceCol[i][0] = 500;
+        calcUpdated++;
+      }
+      calcSheet.getRange(2, 7, lastRow - 1, 5).setValues(statsGrid);
+      calcSheet.getRange(2, 16, lastRow - 1, 1).setValues(diligenceCol);
+    }
   }
 
   repoAppendAuditLog(actor || 'admin', 'SYNC_PAYROLL', 'Calculation', yearMonth,
-    null, { timeClockRows: tcData.length - 1, calcUpdated: calcUpdated }, 'ส่งข้อมูลเวลาเข้า Calculation + Time Clock');
+    null, { timeClockRows: tcData.length - 1, calcUpdated: calcUpdated, calcAdded: calcAdded }, 'ส่งข้อมูลเวลาเข้า Calculation + Time Clock');
 
-  return { rowsWritten: tcData.length - 1, calcUpdated: calcUpdated, sheetUrl: payrollSs.getUrl() };
+  return { rowsWritten: tcData.length - 1, calcUpdated: calcUpdated, calcAdded: calcAdded, sheetUrl: payrollSs.getUrl() };
 }
 
 /**
