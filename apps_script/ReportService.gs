@@ -659,6 +659,8 @@ function getIndividualTimesheet(employeeId, yearMonth) {
     (String(l.start_date).indexOf(yearMonth) === 0 || String(l.end_date).indexOf(yearMonth) === 0));
   const ots = repoReadAll(SHEETS.OT).rows.filter(o =>
     String(o.employee_id) === String(emp.employee_id) && String(o.ot_date).indexOf(yearMonth) === 0);
+  const missedScans = repoReadAll(SHEETS.MISSED_SCAN).rows.filter(m =>
+    String(m.employee_id) === String(emp.employee_id) && String(m.work_date).indexOf(yearMonth) === 0);
 
   const sum = k => daily.reduce((s, r) => s + Number(r[k] || 0), 0);
   const totalLateMin = sum('late_min');
@@ -671,6 +673,7 @@ function getIndividualTimesheet(employeeId, yearMonth) {
     daily: daily,
     leaves: leaves,
     ots: ots,
+    missedScans: missedScans,
     quotas: getLeaveQuotas(emp.employee_id, yearMonth + '-01'),
     summary: {
       workDays: daily.filter(r => r.first_in).length,

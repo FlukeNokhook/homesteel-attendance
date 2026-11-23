@@ -554,8 +554,45 @@
       ].join('');
 
       const todayIsoStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+      const ST_TH = {
+        PENDING: 'รออนุมัติ', APPROVED: 'อนุมัติแล้ว', REJECTED: 'ไม่อนุมัติ',
+        RECORDED: 'บันทึกแล้ว', ACKNOWLEDGED: 'รับทราบแล้ว',
+        ACKNOWLEDGED_PAID: 'รับทราบ (ใช้สิทธิ์ได้)', ACKNOWLEDGED_UNPAID: 'รับทราบ (ไม่อนุมัติใช้สิทธิ์)',
+        WAITING_MEDICAL_CERT: 'รอใบรับรองแพทย์'
+      };
+      const FLAG_TH = {
+        OT_CAPPED: 'สแกนออกไม่ตรงกับ OT ที่อนุมัติ',
+        OT_NO_SCAN: 'มี OT อนุมัติแต่ไม่พบสแกนเข้า-ออกครบ',
+        LEAVE_SCAN_CONFLICT: 'มีทั้งใบลาเต็มวันและสแกนนิ้วในวันเดียวกัน',
+        ODD_SCAN: 'สแกนนิ้วไม่ครบ (ขาดเข้าหรือออก)',
+        SHORT_WORK: 'ชั่วโมงทำงานน้อยกว่าเกณฑ์'
+      };
+      const buildDayEvents = r => {
+        const wd = String(r.work_date);
+        const ev = [];
+        if (r.holiday_name) ev.push(`<div style="color:#5b21b6;">🎉 วันหยุด: <b>${esc(r.holiday_name)}</b></div>`);
+        (data.leaves || []).filter(l => wd >= String(l.start_date) && wd <= String(l.end_date || l.start_date)).forEach(l => {
+          const dur = l.duration_mode === 'HOURS' ? `${l.hours} ชม.` : `${l.days} วัน`;
+          ev.push(`<div style="color:#1e40af;">📝 ${esc(l.leave_type)} (${esc(dur)}) → <b>${esc(ST_TH[l.status] || l.status)}</b></div>`);
+        });
+        (data.ots || []).filter(o => String(o.ot_date) === wd).forEach(o => {
+          const tr = (o.approved_start && o.approved_end) ? `${o.approved_start}–${o.approved_end}` : `${o.requested_start}–${o.requested_end}`;
+          const hrs = o.approved_hours || o.requested_hours;
+          const offTag = o.actual_start === 'OFFSITE_OVERRIDE' ? ' • จ่ายเต็มนอกสถานที่' : '';
+          ev.push(`<div style="color:#166534;">⏰ ขอ OT ${esc(tr)} (${esc(hrs)} ชม.) → <b>${esc(ST_TH[o.status] || o.status)}</b>${offTag}</div>`);
+        });
+        (data.missedScans || []).filter(m => String(m.work_date) === wd).forEach(m => {
+          ev.push(`<div style="color:#92400e;">🔔 แจ้งลืมสแกน (${esc(m.scan_type)}${m.approx_time ? ' ~' + esc(m.approx_time) : ''}): ${esc(m.reason)}</div>`);
+        });
+        String(r.flags || '').split(',').map(f => f.trim()).filter(Boolean).forEach(f => {
+          ev.push(`<div style="color:#b45309; font-weight:600;">⚠️ ${esc(FLAG_TH[f] || f)}</div>`);
+        });
+        if (r.admin_note) ev.push(`<div style="color:#6d28d9;">✏️ แอดมิน: ${esc(r.admin_note)}</div>`);
+        return ev.length ? `<div style="display:grid; gap:3px; font-size:12px; line-height:1.4;">${ev.join('')}</div>` : '<span class="card-sub">-</span>';
+      };
+
       $('personTable').innerHTML = data.daily.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>วันที่</th><th>สถานะ</th><th>เข้า</th><th>ออก</th><th class="num">ทำงาน</th><th class="num">สาย</th><th class="num">ลา (ชม.)</th><th class="num">OT จ่าย</th><th>หมายเหตุ</th><th></th></tr></thead>
+        <thead><tr><th>วันที่</th><th>สถานะ</th><th>เข้า</th><th>ออก</th><th class="num">ทำงาน</th><th class="num">สาย</th><th class="num">ลา (ชม.)</th><th class="num">OT จ่าย</th><th>เหตุการณ์ (Events)</th><th></th></tr></thead>
         <tbody>${data.daily.map(r => {
           const p = dateParts(r.work_date);
           const isFutureDay = String(r.work_date) > todayIsoStr;
@@ -572,7 +609,7 @@
             <td class="num">${hm(r.late_min)}</td>
             <td class="num">${num(r.leave_hours)}</td>
             <td class="num"><b>${num(r.ot_paid_hours)}</b></td>
-            <td class="note">${r.holiday_name ? `<span class="pill pill-violet" style="margin-right:4px;">🎉 ${esc(r.holiday_name)}</span>` : ''}${esc(r.admin_note || r.flags || '')}</td>
+            <td style="min-width:240px;">${buildDayEvents(r)}</td>
             <td>${isFutureDay ? '' : `<button class="btn btn-ghost btn-sm" onclick="openCorrectModal('${esc(r.work_date)}','${esc(r.employee_id)}','${esc(e.name)}','${esc(r.first_in)}','${esc(r.last_out)}','${esc(r.admin_note)}')">✏️ แก้ไข</button>`}</td>
           </tr>`;
         }).join('')}</tbody></table></div>` : emptyState('📭', 'ยังไม่มีข้อมูลรายวันของเดือนนี้');
