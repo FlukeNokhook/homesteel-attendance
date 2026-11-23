@@ -545,14 +545,19 @@
           <div class="s-val" style="font-size:18px; color:${s.diligenceEligible ? 'var(--green)' : 'var(--red)'}">${s.diligenceEligible ? 'ผ่านเกณฑ์' : 'ไม่ผ่าน'}</div></div>`
       ].join('');
 
+      const todayIsoStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
       $('personTable').innerHTML = data.daily.length ? `<div class="table-wrap"><table>
         <thead><tr><th>วันที่</th><th>สถานะ</th><th>เข้า</th><th>ออก</th><th class="num">ทำงาน</th><th class="num">สาย</th><th class="num">ลา (ชม.)</th><th class="num">OT จ่าย</th><th>หมายเหตุ</th><th></th></tr></thead>
         <tbody>${data.daily.map(r => {
           const p = dateParts(r.work_date);
-          const cls = r.flags ? 'row-exc' : (r.is_off_day && !r.first_in ? 'row-off' : '');
+          const isFutureDay = String(r.work_date) > todayIsoStr;
+          const isUpcoming = r.status === 'UPCOMING' || (isFutureDay && !r.first_in && !r.last_out && !r.is_off_day);
+          const cls = r.flags ? 'row-exc' : ((r.is_off_day && !r.first_in) || isUpcoming ? 'row-off' : '');
+          const stLabel = isUpcoming ? 'ยังไม่ถึงวัน' : (r.status === 'RESOLVED' ? 'ตรวจแล้ว' : r.status);
+          const stClass = isUpcoming ? 'pill-gray' : (r.status === 'CORRECTED' ? 'pill-violet' : r.flags ? 'pill-amber' : Number(r.absent_min) > 0 ? 'pill-red' : r.is_off_day ? 'pill-gray' : 'pill-green');
           return `<tr class="${cls}">
             <td><div class="date-badge"><b>${p.day}</b><span>${p.dow}</span></div></td>
-            <td><span class="pill ${r.status === 'CORRECTED' ? 'pill-violet' : r.flags ? 'pill-amber' : Number(r.absent_min) > 0 ? 'pill-red' : r.is_off_day ? 'pill-gray' : 'pill-green'}">${esc(r.status)}</span></td>
+            <td><span class="pill ${stClass}">${esc(stLabel)}</span></td>
             <td class="mono">${esc(r.first_in || '-')}</td>
             <td class="mono">${esc(r.last_out || '-')}</td>
             <td class="num">${hm(r.work_minutes)}</td>
@@ -560,7 +565,7 @@
             <td class="num">${num(r.leave_hours)}</td>
             <td class="num"><b>${num(r.ot_paid_hours)}</b></td>
             <td class="note">${r.holiday_name ? `<span class="pill pill-violet" style="margin-right:4px;">🎉 ${esc(r.holiday_name)}</span>` : ''}${esc(r.admin_note || r.flags || '')}</td>
-            <td><button class="btn btn-ghost btn-sm" onclick="openCorrectModal('${esc(r.work_date)}','${esc(r.employee_id)}','${esc(e.name)}','${esc(r.first_in)}','${esc(r.last_out)}','${esc(r.admin_note)}')">✏️ แก้ไข</button></td>
+            <td>${isFutureDay ? '' : `<button class="btn btn-ghost btn-sm" onclick="openCorrectModal('${esc(r.work_date)}','${esc(r.employee_id)}','${esc(e.name)}','${esc(r.first_in)}','${esc(r.last_out)}','${esc(r.admin_note)}')">✏️ แก้ไข</button>`}</td>
           </tr>`;
         }).join('')}</tbody></table></div>` : emptyState('📭', 'ยังไม่มีข้อมูลรายวันของเดือนนี้');
 

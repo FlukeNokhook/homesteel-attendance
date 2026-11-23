@@ -246,17 +246,27 @@ function submitLeaveRequest(emp, payload) {
   let sickNoCertSeq = 0;
 
   if (leaveType === 'ลาพักร้อน') {
+    const vacAdvanceDays = 3;
+    if (diffDays < vacAdvanceDays) {
+      const minD = new Date(today + 'T00:00:00+07:00');
+      minD.setDate(minD.getDate() + vacAdvanceDays);
+      const minStr = Utilities.formatDate(minD, TIMEZONE, 'yyyy-MM-dd');
+      throw new Error('ลาพักร้อนต้องยื่นล่วงหน้าอย่างน้อย ' + vacAdvanceDays + ' วัน (เลือกวันลาได้ตั้งแต่ ' + minStr + ' เป็นต้นไป) ครับ');
+    }
     status = 'PENDING';
-    noticeType = diffDays > 0 ? 'ADVANCE' : (diffDays === 0 ? 'SAME_DAY' : 'LATE');
-    if (diffDays < 0) flags.push('LATE_NOTICE');
+    noticeType = 'ADVANCE';
   } else if (leaveType === 'ลากิจ') {
     status = 'RECORDED';
-    const advanceDays = repoGetSettingNum('PERSONAL_ADVANCE_DAYS', 1);
-    if (diffDays >= advanceDays) {
+    const settings = repoGetSettings();
+    const workStart = settings.WORK_START_TIME || '08:00';
+    const shiftStartMs = new Date(startDate + 'T' + workStart + ':00+07:00').getTime();
+    const hoursAhead = (shiftStartMs - Date.now()) / 3600000;
+    if (hoursAhead >= 24) {
       noticeType = 'ADVANCE';
-    } else if (diffDays === 0) {
+    } else if (hoursAhead >= 0) {
       noticeType = 'URGENT';
-      if (!urgentReason) urgentReason = 'เหตุกะทันหัน';
+      if (!urgentReason) urgentReason = 'เหตุกะทันหัน (แจ้งล่วงหน้าน้อยกว่า 24 ชม.)';
+      flags.push('LATE_NOTICE');
     } else {
       noticeType = 'LATE';
       flags.push('LATE_NOTICE');

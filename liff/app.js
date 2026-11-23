@@ -199,20 +199,42 @@ function bindForm() {
   updateOtTotal();
 }
 
+function addDaysIso(isoDate, days) {
+  const d = new Date(isoDate + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function updateLeaveForm() {
   const type = radioVal('leaveType');
   const mode = radioVal('durationMode');
+  const today = todayIso();
+  const minVacDate = addDaysIso(today, 3); // ล่วงหน้า 3 วัน (เช่น วันนี้ 23 -> เลือกได้ตั้งแต่ 26)
+
+  if (type === 'ลาพักร้อน') {
+    $('leaveStart').min = minVacDate;
+    $('leaveEnd').min = minVacDate;
+    if (!$('leaveStart').value || $('leaveStart').value < minVacDate) $('leaveStart').value = minVacDate;
+    if (!$('leaveEnd').value || $('leaveEnd').value < $('leaveStart').value) $('leaveEnd').value = $('leaveStart').value;
+  } else {
+    $('leaveStart').removeAttribute('min');
+    $('leaveEnd').removeAttribute('min');
+  }
+
   const s = $('leaveStart').value;
   const e = mode === 'FULL_DAY' ? $('leaveEnd').value : s;
   const q = DATA.quotas || {};
+
+  // ตรวจเงื่อนไขลากิจล่วงหน้า 24 ชม. (เทียบกับเวลา 08:00 น. ของวันลา)
+  const isPersonalUnder24h = type === 'ลากิจ' && s && ((new Date(s + 'T08:00:00+07:00').getTime() - Date.now()) < 24 * 3600 * 1000);
 
   $('leaveEndWrap').classList.toggle('hidden', mode !== 'FULL_DAY');
   $('leaveHoursWrap').classList.toggle('hidden', mode !== 'HOURS');
   $('leaveStartLabel').textContent = mode === 'FULL_DAY' ? 'ตั้งแต่วันที่' : 'วันที่ลา';
   $('sickReasonWrap').classList.toggle('hidden', type !== 'ลาป่วย');
-  $('urgentWrap').classList.toggle('hidden', !(type === 'ลากิจ' && s === todayIso()));
+  $('urgentWrap').classList.toggle('hidden', !isPersonalUnder24h);
 
-  // แสดงสิทธิ์วันลาและประวัติการป่วยของเดือนนี้อย่างชัดเจน
+  // แสดงสิทธิ์วันลาและเงื่อนไขล่วงหน้าอย่างชัดเจน
   const banner = $('quotaBanner');
   if (type === 'ลาป่วย') {
     const noCertCount = q.sickNoCertCountMonth || 0;
@@ -228,10 +250,13 @@ function updateLeaveForm() {
     banner.innerHTML = `${monthStatus}<br>สิทธิ์ลาป่วยปีนี้คงเหลือ: <b>${q.sickRemainingYear ?? 30}</b> / ${q.sickLimit ?? 30} วัน${warn}`;
     banner.classList.remove('hidden');
   } else if (type === 'ลากิจ') {
-    banner.innerHTML = `สิทธิ์ลากิจปีนี้คงเหลือ: <b>${q.personalRemaining ?? 3}</b> / ${q.personalLimit ?? 3} วัน<br><span class="hint">ลากิจบันทึกทันทีและแจ้งหัวหน้ารับทราบ</span>`;
+    const warn24h = isPersonalUnder24h
+      ? `<div style="margin-top:6px; padding:7px 10px; border-radius:8px; background:#fef3c7; color:#92400e; font-weight:600;">⚠️ ลากิจต้องแจ้งล่วงหน้าอย่างน้อย 24 ชม. (กรณีกะทันหันกรุณาระบุเหตุผลด้านล่าง)</div>`
+      : `<div class="hint" style="margin-top:4px;">⏰ ลากิจต้องแจ้งล่วงหน้าอย่างน้อย 24 ชม. • บันทึกทันทีและแจ้งหัวหน้ารับทราบ</div>`;
+    banner.innerHTML = `สิทธิ์ลากิจปีนี้คงเหลือ: <b>${q.personalRemaining ?? 3}</b> / ${q.personalLimit ?? 3} วัน${warn24h}`;
     banner.classList.remove('hidden');
   } else if (type === 'ลาพักร้อน') {
-    banner.innerHTML = `🌴 ลาพักร้อนต้องรอหัวหน้างานอนุมัติก่อนนะครับ`;
+    banner.innerHTML = `🌴 ลาพักร้อนต้องยื่นล่วงหน้าอย่างน้อย <b>3 วัน</b> (เลือกได้ตั้งแต่ <b>${esc(thaiDate(minVacDate))}</b> เป็นต้นไป) และรอหัวหน้างานอนุมัติครับ`;
     banner.classList.remove('hidden');
   } else {
     banner.classList.add('hidden');

@@ -269,7 +269,9 @@ function computeDayMetrics(emp, dateStr, scanIn, scanOut, dayScansCount, dayLeav
     ? 'CORRECTED'
     : (existingManualStatus === 'RESOLVED'
       ? 'RESOLVED'
-      : (flags.length ? 'EXCEPTION' : (absentMin > 0 ? 'ABSENT' : (offDay && !scanIn ? 'OFF' : 'NORMAL'))));
+      : (isFuture && !offDay && !scanIn && !scanOut
+        ? 'UPCOMING'
+        : (flags.length ? 'EXCEPTION' : (absentMin > 0 ? 'ABSENT' : (offDay && !scanIn ? 'OFF' : 'NORMAL')))));
 
   return {
     work_date: dateStr,
@@ -442,6 +444,9 @@ function safeAutoRecompute(dateStr) {
  */
 function adminCorrectDaily(workDate, employeeId, firstIn, lastOut, adminNote, reason, actor) {
   if (!reason) throw new Error('กรุณาระบุเหตุผลการแก้ไขเพื่อบันทึกใน Audit Log ครับ');
+  if (String(workDate) > todayStr()) {
+    throw new Error('วันที่ ' + workDate + ' ยังไม่ถึงวันทำงาน ไม่สามารถแก้ไขเวลาเข้า-ออกล่วงหน้าได้ครับ');
+  }
   repoAssertPeriodEditable(workDate);
 
   const emp = repoFindEmployeeById(employeeId);
