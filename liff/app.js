@@ -516,16 +516,18 @@ function renderApprovals() {
 
   let html = '';
   if (vacs.length) {
-    html += `<div class="group-label">🌴 ลาพักร้อนรออนุมัติ (${vacs.length})</div>` + vacs.map(l => `
-      <div class="item"><div class="item-ico" style="background:var(--brand-soft)">🌴</div><div class="item-body">
+    html += `<div class="group-label">🌴 ลาพักร้อนรออนุมัติ (${vacs.length})</div>` + vacs.map(l => {
+      const dText = l.end_date && l.end_date !== l.start_date ? `${thaiDate(l.start_date)} – ${thaiDate(l.end_date)}` : thaiDate(l.start_date);
+      return `<div class="item"><div class="item-ico" style="background:var(--brand-soft)">🌴</div><div class="item-body">
         <div class="item-title">${esc(l.name)} • ลาพักร้อน ${esc(leaveDur(l))}</div>
-        <div class="item-meta">📅 ${esc(thaiDate(l.start_date))}<br>💬 ${esc(l.reason || '-')}</div>
+        <div class="item-meta">📅 ${esc(dText)}<br>💬 ${esc(l.reason || '-')}</div>
         ${l.consecutive_alert ? `<div style="margin-top:6px; padding:7px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-size:12.5px; font-weight:600;">🚨 ${esc(l.consecutive_alert)}</div>` : ''}
         <div class="item-actions">
           <button class="btn btn-reject btn-sm" onclick="decideItem('LEAVE','${esc(l.request_id)}',false)">ไม่อนุมัติ</button>
           <button class="btn btn-approve btn-sm" onclick="decideItem('LEAVE','${esc(l.request_id)}',true)">✓ อนุมัติ</button>
         </div>
-      </div></div>`).join('');
+      </div></div>`;
+    }).join('');
   }
   if (ots.length) {
     html += `<div class="group-label">⏰ โอทีรออนุมัติ (${ots.length})</div>` + ots.map(o => {
@@ -571,9 +573,10 @@ function renderApprovals() {
         : `<div class="item-actions">
             <button class="btn btn-primary btn-sm" style="width:100%;" onclick="ackItem('${esc(l.request_id)}')">👍 รับทราบ</button>
           </div>`;
+      const dText = l.end_date && l.end_date !== l.start_date ? `${thaiDate(l.start_date)} – ${thaiDate(l.end_date)}` : thaiDate(l.start_date);
       return `<div class="item"><div class="item-ico" style="background:var(--brand-soft)">${l.leave_type === 'ลาป่วย' ? '🤒' : '📋'}</div><div class="item-body">
         <div class="item-title">${esc(l.name)} • ${esc(l.leave_type)} ${esc(leaveDur(l))}</div>
-        <div class="item-meta">📅 ${esc(thaiDate(l.start_date))}<br>💬 ${esc(l.reason || '-')}</div>
+        <div class="item-meta">📅 ${esc(dText)}<br>💬 ${esc(l.reason || '-')}</div>
         ${sickBox}${consecBox}${actionHtml}
       </div></div>`;
     }).join('');

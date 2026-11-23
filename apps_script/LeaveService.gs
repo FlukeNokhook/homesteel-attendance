@@ -86,13 +86,20 @@ function checkConsecutiveLeaves(employeeId, startDate, endDate, allLeaves, curre
     else break;
   }
 
+  const holidayMap = repoGetHolidayMap();
   const timeline = [];
   const d = new Date(curStart + 'T00:00:00+07:00');
   const e = new Date(curEnd + 'T00:00:00+07:00');
   let guard = 0;
   while (d <= e && guard < 60) {
     const ds = Utilities.formatDate(d, TIMEZONE, 'yyyy-MM-dd');
-    if (dayMap[ds]) timeline.push(ds.slice(8, 10) + '/' + ds.slice(5, 7) + ' ' + dayMap[ds]);
+    const shortD = ds.slice(8, 10) + '/' + ds.slice(5, 7);
+    if (dayMap[ds]) {
+      timeline.push(shortD + ' ' + dayMap[ds]);
+    } else if (isOffDay(ds, holidaySet)) {
+      const hName = holidayMap[ds] ? ('วันหยุด:' + holidayMap[ds]) : 'วันหยุดอาทิตย์';
+      timeline.push(shortD + ' (' + hName + ')');
+    }
     d.setDate(d.getDate() + 1);
     guard++;
   }
@@ -100,7 +107,7 @@ function checkConsecutiveLeaves(employeeId, startDate, endDate, allLeaves, curre
   return {
     consecutiveDays: timeline.length,
     isAlert: timeline.length >= 3,
-    summaryText: timeline.length >= 3 ? ('ลาต่อเนื่อง ' + timeline.length + ' วันทำงาน: ' + timeline.join(' → ')) : ''
+    summaryText: timeline.length >= 3 ? ('หยุดต่อเนื่อง ' + timeline.length + ' วัน: ' + timeline.join(' → ')) : ''
   };
 }
 
