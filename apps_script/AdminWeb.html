@@ -85,6 +85,9 @@
 
     .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 14px; margin-bottom: 18px; }
     .stat { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); border: 1px solid rgba(226,232,240,.6); }
+    .stat.clickable { cursor: pointer; transition: transform .12s, border-color .15s, box-shadow .15s; }
+    .stat.clickable:hover { transform: translateY(-2px); border-color: var(--brand-2); box-shadow: 0 6px 18px rgba(29,78,216,.12); }
+    .stat .s-hint { font-size: 11px; color: var(--brand); margin-top: 6px; font-weight: 500; }
     .stat .s-ico { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-size: 17px; margin-bottom: 10px; }
     .stat .s-label { color: var(--text-2); font-size: 13px; }
     .stat .s-val { font-size: 22px; font-weight: 700; margin-top: 2px; }
@@ -467,8 +470,10 @@
       if (tab === 'payroll') loadPayroll();
     }
 
-    function statCard(icon, bg, label, val, unit) {
-      return `<div class="stat"><div class="s-ico" style="background:${bg}">${icon}</div><div class="s-label">${esc(label)}</div><div class="s-val">${esc(val)}<small>${esc(unit || '')}</small></div></div>`;
+    function statCard(icon, bg, label, val, unit, onClickCode) {
+      const clickAttr = onClickCode ? ` class="stat clickable" onclick="${onClickCode}"` : ' class="stat"';
+      const hintHtml = onClickCode ? '<div class="s-hint">คลิกดูรายละเอียด ›</div>' : '';
+      return `<div${clickAttr}><div class="s-ico" style="background:${bg}">${icon}</div><div class="s-label">${esc(label)}</div><div class="s-val">${esc(val)}<small>${esc(unit || '')}</small></div>${hintHtml}</div>`;
     }
 
     function renderOverview(ov) {
@@ -529,20 +534,23 @@
       catch (err) { toast(err.message, 'error'); }
     }
 
+    let PERSON_DATA = null;
+
     function renderPerson(data) {
+      PERSON_DATA = data;
       const e = data.employee, s = data.summary, q = data.quotas;
       $('empHead').innerHTML = `<div class="avatar">${initials(e.name)}</div>
         <div><div style="font-weight:700; font-size:16px;">${esc(e.name)}</div>
         <div class="card-sub">รหัส ${esc(e.code || e.employee_id)}${e.department ? ' • ' + esc(e.department) : ''} • ลากิจใช้ไป ${q.personalUsedYear}/${q.personalLimit} วัน • ลาป่วยใช้ไป ${q.sickUsedYear}/${q.sickLimit} วัน</div></div>`;
 
       $('personStats').innerHTML = [
-        statCard('📅', 'var(--brand-soft)', 'มาทำงาน', s.workDays, 'วัน'),
-        statCard('⏰', 'var(--red-soft)', 'มาสาย', s.lateCount, `ครั้ง (${s.totalLateMin} น.)`),
-        statCard('🚫', '#f1f5f9', 'ขาดงาน', (s.totalAbsentMin / 480).toFixed(1).replace('.0', ''), 'วัน'),
-        statCard('📝', 'var(--brand-soft)', 'ลา', s.totalLeaveHours, 'ชม.'),
-        statCard('💪', 'var(--green-soft)', 'โอทีจ่ายจริง', s.totalOtPaid, `/ ${s.totalOtApproved} ชม.`),
-        `<div class="stat"><div class="s-ico" style="background:${s.diligenceEligible ? 'var(--green-soft)' : 'var(--red-soft)'}">🏅</div><div class="s-label">เบี้ยขยัน</div>
-          <div class="s-val" style="font-size:18px; color:${s.diligenceEligible ? 'var(--green)' : 'var(--red)'}">${s.diligenceEligible ? 'ผ่านเกณฑ์' : 'ไม่ผ่าน'}</div></div>`
+        statCard('📅', 'var(--brand-soft)', 'มาทำงาน', s.workDays, 'วัน', "showPersonDetail('work')"),
+        statCard('⏰', 'var(--red-soft)', 'มาสาย', s.lateCount, `ครั้ง (${s.totalLateMin} น.)`, "showPersonDetail('late')"),
+        statCard('🚫', '#f1f5f9', 'ขาดงาน', (s.totalAbsentMin / 480).toFixed(1).replace('.0', ''), 'วัน', "showPersonDetail('absent')"),
+        statCard('📝', 'var(--brand-soft)', 'ลา', s.totalLeaveHours, 'ชม.', "showPersonDetail('leave')"),
+        statCard('💪', 'var(--green-soft)', 'โอทีจ่ายจริง', s.totalOtPaid, `/ ${s.totalOtApproved} ชม.`, "showPersonDetail('ot')"),
+        `<div class="stat clickable" onclick="showPersonDetail('diligence')"><div class="s-ico" style="background:${s.diligenceEligible ? 'var(--green-soft)' : 'var(--red-soft)'}">🏅</div><div class="s-label">เบี้ยขยัน</div>
+          <div class="s-val" style="font-size:18px; color:${s.diligenceEligible ? 'var(--green)' : 'var(--red)'}">${s.diligenceEligible ? 'ผ่านเกณฑ์' : 'ไม่ผ่าน'}</div><div class="s-hint">คลิกดูรายละเอียด ›</div></div>`
       ].join('');
 
       const todayIsoStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -575,6 +583,80 @@
       ].sort((a, b) => String(a.d).localeCompare(String(b.d)));
       $('personRequests').innerHTML = items.length ? `<div class="req-list">${items.map(it => it.kind === 'leave' ? leaveCard(it.l, 'NONE') : otCard(it.o, false)).join('')}</div>`
         : emptyState('🗂️', 'ไม่มีใบลาหรือโอทีในเดือนนี้');
+    }
+
+    function showPersonDetail(kind) {
+      if (!PERSON_DATA) return;
+      const d = PERSON_DATA, empName = d.employee.name;
+      if (kind === 'ot') {
+        const dailyMap = {};
+        d.daily.forEach(r => { dailyMap[r.work_date] = r; });
+        const rows = d.ots.length ? `<div class="table-wrap"><table>
+          <thead><tr><th>วันที่</th><th>เวลาที่ขอ/อนุมัติ</th><th>งานอ้างอิง</th><th class="num">อนุมัติ (ชม.)</th><th class="num">จ่ายจริง (ชม.)</th><th>สถานะ</th></tr></thead>
+          <tbody>${d.ots.map(o => {
+            const dr = dailyMap[o.ot_date] || {};
+            const tRange = (o.approved_start && o.approved_end) ? `${o.approved_start}–${o.approved_end}` : `${o.requested_start}–${o.requested_end}`;
+            return `<tr>
+              <td class="mono">${esc(shortDate(o.ot_date))}</td>
+              <td class="mono">${esc(tRange)}</td>
+              <td>${esc(o.job_reference || '-')}</td>
+              <td class="num">${esc(o.approved_hours || o.requested_hours)}</td>
+              <td class="num"><b>${esc(dr.ot_paid_hours !== undefined ? dr.ot_paid_hours : '-')}</b></td>
+              <td><span class="pill pill-gray">${esc(o.status)}</span></td>
+            </tr>`;
+          }).join('')}</tbody></table></div>` : emptyState('⏰', 'ไม่มีรายการ OT ในเดือนนี้');
+        modal({ title: `รายละเอียดโอที • ${empName}`, body: `จ่ายจริงรวม ${d.summary.totalOtPaid} ชม. จากที่อนุมัติทั้งหมด ${d.summary.totalOtApproved} ชม.`, html: rows, wide: true, hideConfirm: true });
+        return;
+      }
+      if (kind === 'leave') {
+        const rows = d.leaves.length ? `<div class="table-wrap"><table>
+          <thead><tr><th>วันที่</th><th>ประเภท</th><th class="num">จำนวน</th><th>เหตุผล</th><th>สถานะ</th></tr></thead>
+          <tbody>${d.leaves.map(l => `<tr>
+            <td class="mono">${esc(shortDate(l.start_date))}${l.end_date !== l.start_date ? ' – ' + esc(shortDate(l.end_date)) : ''}</td>
+            <td><b>${esc(l.leave_type)}</b></td>
+            <td class="num">${l.duration_mode === 'HOURS' ? esc(l.hours) + ' ชม.' : esc(l.days) + ' วัน'}</td>
+            <td>${esc(l.reason || '-')}</td>
+            <td><span class="pill pill-gray">${esc(l.status)}</span></td>
+          </tr>`).join('')}</tbody></table></div>` : emptyState('📝', 'ไม่มีรายการลาในเดือนนี้');
+        modal({ title: `รายละเอียดการลา • ${empName}`, body: `รวมชั่วโมงลาที่ได้รับสิทธิ์ ${d.summary.totalLeaveHours} ชม.`, html: rows, wide: true, hideConfirm: true });
+        return;
+      }
+      if (kind === 'late') {
+        const lates = d.daily.filter(r => Number(r.late_min) > 0);
+        const rows = lates.length ? `<div class="table-wrap"><table>
+          <thead><tr><th>วันที่</th><th>เวลาเข้า</th><th class="num">สาย (นาที)</th><th>หมายเหตุ</th></tr></thead>
+          <tbody>${lates.map(r => `<tr><td class="mono">${esc(shortDate(r.work_date))}</td><td class="mono">${esc(r.first_in)}</td><td class="num" style="color:var(--red);"><b>${r.late_min}</b></td><td>${esc(r.admin_note || '-')}</td></tr>`).join('')}</tbody></table></div>`
+          : emptyState('✨', 'ไม่มีรายการมาสายในเดือนนี้');
+        modal({ title: `รายละเอียดมาสาย • ${empName}`, body: `มาสายทั้งหมด ${d.summary.lateCount} ครั้ง รวม ${d.summary.totalLateMin} นาที`, html: rows, wide: true, hideConfirm: true });
+        return;
+      }
+      if (kind === 'absent') {
+        const abs = d.daily.filter(r => Number(r.absent_min) > 0);
+        const rows = abs.length ? `<div class="table-wrap"><table>
+          <thead><tr><th>วันที่</th><th class="num">ขาดงาน (ชม.)</th><th>หมายเหตุ</th></tr></thead>
+          <tbody>${abs.map(r => `<tr><td class="mono">${esc(shortDate(r.work_date))}</td><td class="num" style="color:var(--red);"><b>${(r.absent_min / 60).toFixed(1)}</b></td><td>${esc(r.admin_note || 'ไม่มีสแกนนิ้วและไม่มีใบลา')}</td></tr>`).join('')}</tbody></table></div>`
+          : emptyState('✨', 'ไม่มีรายการขาดงานในเดือนนี้');
+        modal({ title: `รายละเอียดขาดงาน • ${empName}`, html: rows, wide: true, hideConfirm: true });
+        return;
+      }
+      if (kind === 'work') {
+        const works = d.daily.filter(r => r.first_in);
+        const rows = works.length ? `<div class="table-wrap"><table>
+          <thead><tr><th>วันที่</th><th>เข้า</th><th>ออก</th><th class="num">ทำงาน</th></tr></thead>
+          <tbody>${works.map(r => `<tr><td class="mono">${esc(shortDate(r.work_date))}</td><td class="mono">${esc(r.first_in)}</td><td class="mono">${esc(r.last_out || '-')}</td><td class="num">${hm(r.work_minutes)}</td></tr>`).join('')}</tbody></table></div>`
+          : emptyState('📅', 'ยังไม่มีวันที่มาทำงาน');
+        modal({ title: `รายละเอียดวันมาทำงาน • ${empName}`, body: `มาทำงานทั้งหมด ${d.summary.workDays} วัน`, html: rows, wide: true, hideConfirm: true });
+        return;
+      }
+      if (kind === 'diligence') {
+        const s = d.summary;
+        const html = `<ul style="line-height:1.9; padding-left:20px; margin:0;">
+          <li>มาสาย: <b>${s.lateCount} ครั้ง (${s.totalLateMin} นาที)</b> ${s.totalLateMin === 0 ? '✅' : '❌'}</li>
+          <li>ขาดงาน: <b>${(s.totalAbsentMin / 60).toFixed(1)} ชม.</b> ${s.totalAbsentMin === 0 ? '✅' : '❌'}</li>
+          <li>ลางานทุกประเภท: <b>${s.totalLeaveHours} ชม.</b> ${s.totalLeaveHours === 0 ? '✅' : '❌'}</li>
+        </ul>`;
+        modal({ title: `เกณฑ์เบี้ยขยัน • ${empName}`, body: s.diligenceEligible ? 'ผ่านเกณฑ์เบี้ยขยัน (ไม่ขาด ไม่ลา ไม่สาย)' : 'ไม่ผ่านเกณฑ์เบี้ยขยันในเดือนนี้', html: html, hideConfirm: true });
+      }
     }
 
     async function openCorrectModal(workDate, empId, empName, firstIn, lastOut, note) {
