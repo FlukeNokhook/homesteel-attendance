@@ -191,14 +191,13 @@ function repoGetEmployees() {
 }
 
 function repoGetHolidayMap() {
-  return repoCacheGet('cache_holidays_map', 300, function () {
-    const map = {};
-    repoReadAll(SHEETS.HOLIDAYS).rows.forEach(h => {
-      const d = String(h.holiday_date || '').trim();
-      if (d) map[d] = String(h.holiday_name || 'วันหยุดนักขัตฤกษ์').trim();
-    });
-    return map;
+  // แท็บ Holidays มีไม่กี่แถว อ่านสดทุกครั้งเพื่อให้การเพิ่ม/ลบวันหยุดมีผลทันทีโดยไม่ติด Cache
+  const map = {};
+  repoReadAll(SHEETS.HOLIDAYS).rows.forEach(h => {
+    const d = String(h.holiday_date || '').trim();
+    if (d) map[d] = String(h.holiday_name || 'วันหยุดนักขัตฤกษ์').trim();
   });
+  return map;
 }
 
 function repoGetHolidaySet() {

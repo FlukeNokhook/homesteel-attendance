@@ -68,6 +68,7 @@ function handleLiffAction(action, body) {
         role: emp.role || 'employee'
       },
       quotas: getLeaveQuotas(emp.employee_id, todayStr()),
+      holidays: repoGetHolidayMap(),
       leaves: listMyLeaves(emp.employee_id),
       ots: listMyOTs(emp.employee_id),
       attendance: listMyAttendance(emp.employee_id, payload.year_month),

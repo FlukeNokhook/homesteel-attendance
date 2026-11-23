@@ -205,6 +205,48 @@ function addDaysIso(isoDate, days) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function checkClientConsecutive(startDate, endDate, leaveType) {
+  if (!startDate) return '';
+  const hMap = DATA.holidays || {};
+  const isOff = ds => (new Date(ds + 'T00:00:00').getDay() === 0) || !!hMap[ds];
+  const dayMap = {};
+  const addRange = (s, e, label) => {
+    let cur = s, guard = 0;
+    while (cur <= (e || s) && guard < 60) {
+      if (!isOff(cur)) dayMap[cur] = label;
+      cur = addDaysIso(cur, 1);
+      guard++;
+    }
+  };
+  (DATA.leaves || []).filter(l => String(l.status).toUpperCase() !== 'REJECTED')
+    .forEach(l => addRange(String(l.start_date), String(l.end_date || l.start_date), l.leave_type));
+  addRange(startDate, endDate || startDate, leaveType || 'ลา');
+
+  const shiftWork = (ds, delta) => {
+    let cur = ds;
+    for (let i = 0; i < 14; i++) {
+      cur = addDaysIso(cur, delta);
+      if (!isOff(cur)) return cur;
+    }
+    return ds;
+  };
+
+  let cStart = startDate, cEnd = endDate || startDate;
+  while (true) { const p = shiftWork(cStart, -1); if (dayMap[p]) cStart = p; else break; }
+  while (true) { const n = shiftWork(cEnd, 1); if (dayMap[n]) cEnd = n; else break; }
+
+  const timeline = [];
+  let cur = cStart, guard = 0;
+  while (cur <= cEnd && guard < 60) {
+    const shortD = cur.slice(8, 10) + '/' + cur.slice(5, 7);
+    if (dayMap[cur]) timeline.push(`${shortD} ${dayMap[cur]}`);
+    else if (isOff(cur)) timeline.push(`${shortD} (${hMap[cur] ? 'วันหยุด:' + hMap[cur] : 'วันหยุดอาทิตย์'})`);
+    cur = addDaysIso(cur, 1);
+    guard++;
+  }
+  return timeline.length >= 3 ? `หยุดต่อเนื่อง ${timeline.length} วัน: ${timeline.join(' → ')}` : '';
+}
+
 function updateLeaveForm() {
   const type = radioVal('leaveType');
   const mode = radioVal('durationMode');
@@ -267,8 +309,10 @@ function updateLeaveForm() {
     const days = Math.round((new Date(e) - new Date(s)) / 86400000) + 1;
     durText = `${days} วัน${days > 1 ? ' (ระบบนับเฉพาะวันทำงาน)' : ''}`;
   }
+  const consecWarn = s ? checkClientConsecutive(s, e, type) : '';
   $('leaveSummary').innerHTML = s
-    ? `<b>${esc(type)}</b> • ${esc(durText)}<br>📅 ${esc(thaiDate(s))}${e && e !== s ? ' – ' + esc(thaiDate(e)) : ''}`
+    ? `<b>${esc(type)}</b> • ${esc(durText)}<br>📅 ${esc(thaiDate(s))}${e && e !== s ? ' – ' + esc(thaiDate(e)) : ''}` +
+      (consecWarn ? `<div style="margin-top:8px; padding:8px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-size:13px; font-weight:600;">🚨 แจ้งเตือน: ${esc(consecWarn)}</div>` : '')
     : '';
 }
 
@@ -328,6 +372,17 @@ async function submitLeave(e) {
   const start = $('leaveStart').value;
   const end = mode === 'FULL_DAY' ? $('leaveEnd').value : start;
   if (end < start) { toast('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มลานะครับ', true); return; }
+
+  const consecWarn = checkClientConsecutive(start, end, radioVal('leaveType'));
+  if (consecWarn) {
+    const ok = await sheet({
+      title: '⚠️ แจ้งเตือนการหยุดต่อเนื่องตั้งแต่ 3 วันขึ้นไป',
+      body: `${consecWarn}\n\nระบบจะบันทึกใบลาและส่งแจ้งเตือนนี้ให้หัวหน้างานพิจารณา คุณต้องการยืนยันส่งใบลาหรือไม่?`,
+      confirmText: 'ยืนยันส่งใบลา',
+      confirmClass: 'btn-primary'
+    });
+    if (!ok) return;
+  }
 
   const btn = $('btnSubmitLeave');
   btn.disabled = true; btn.textContent = 'กำลังส่งใบลา...';
