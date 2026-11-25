@@ -688,6 +688,119 @@ function getIndividualTimesheet(employeeId, yearMonth) {
   };
 }
 
+/**
+ * ตารางเวลาทำงานทั้งเดือนแบบ Matrix (พนักงานทุกคน × วันที่ 1–31) แยกสีดูง่ายในหน้าเดียว
+ */
+function getMonthlyMatrix(yearMonth) {
+  const p = String(yearMonth).split('-');
+  const y = parseInt(p[0], 10);
+  const m = parseInt(p[1], 10);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const dowTh = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+  const holidayMap = repoGetHolidayMap();
+  const today = todayStr();
+
+  const dayHeaders = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = yearMonth + '-' + pad2(d);
+    const dowIdx = new Date(ds + 'T00:00:00+07:00').getDay();
+    dayHeaders.push({
+      day: d,
+      date: ds,
+      dow: dowTh[dowIdx],
+      isSunday: dowIdx === 0,
+      holidayName: holidayMap[ds] || ''
+    });
+  }
+
+  const employees = repoGetEmployees().filter(isActiveEmp);
+  const dailyRows = repoReadAll(SHEETS.ATTENDANCE_DAILY).rows
+    .filter(r => String(r.work_date).indexOf(yearMonth) === 0);
+  const ots = repoReadAll(SHEETS.OT).rows
+    .filter(o => String(o.ot_date).indexOf(yearMonth) === 0 && String(o.status).toUpperCase() === 'APPROVED');
+
+  const dailyMap = {};
+  dailyRows.forEach(r => { dailyMap[String(r.employee_id) + '|' + String(r.work_date)] = r; });
+  const offsiteSet = new Set();
+  ots.forEach(o => {
+    if (String(o.actual_start || '') === 'OFFSITE_OVERRIDE') {
+      offsiteSet.add(String(o.employee_id) + '|' + String(o.ot_date));
+    }
+  });
+
+  const rows = employees.map((emp, idx) => {
+    const empId = String(emp.employee_id);
+    const cells = dayHeaders.map(dh => {
+      const r = dailyMap[empId + '|' + dh.date];
+      const isFuture = dh.date > today;
+      const isOffsite = offsiteSet.has(empId + '|' + dh.date);
+      const otHrs = r ? Number(r.ot_paid_hours || 0) : 0;
+      const otText = otHrs > 0 ? ('OT' + otHrs) : '';
+
+      let type = 'empty';
+      let text = '-';
+      if (dh.holidayName && (!r || !r.first_in)) {
+        type = 'holiday'; text = 'นักขัตฯ';
+      } else if (dh.isSunday && (!r || !r.first_in)) {
+        type = 'sunday'; text = 'หยุด';
+      } else if (!r || r.status === 'UPCOMING' || (isFuture && !r.first_in && !r.last_out)) {
+        type = 'upcoming'; text = '-';
+      } else {
+        const flags = String(r.flags || '');
+        const late = Number(r.late_min || 0);
+        const abs = Number(r.absent_min || 0);
+        const lvHrs = Number(r.leave_hours || 0);
+        const lvType = String(r.leave_type || '');
+
+        if (flags.indexOf('ODD_SCAN') !== -1) {
+          type = 'missed'; text = 'ลืมสแกน';
+        } else if (abs > 0) {
+          type = 'absent'; text = 'ขาด';
+        } else if (lvHrs > 0 && !r.first_in) {
+          type = 'leave';
+          text = lvType.indexOf('ป่วย') !== -1 ? 'ป่วย' : (lvType.indexOf('กิจ') !== -1 ? 'กิจ' : (lvType.indexOf('พักร้อน') !== -1 ? 'พักร้อน' : 'ลา'));
+        } else if (isOffsite || r.status === 'CORRECTED') {
+          type = 'offsite'; text = 'นอก';
+        } else if (late > 0) {
+          type = 'late'; text = 'สาย ' + late;
+        } else if (r.first_in) {
+          type = 'normal'; text = '✓';
+        } else {
+          type = 'upcoming'; text = '-';
+        }
+      }
+
+      const tip = r
+        ? ((r.first_in || r.last_out) ? ('เข้า ' + (r.first_in || '-') + ' • ออก ' + (r.last_out || '-')) : text) +
+          (otText ? ' • ' + otText : '') + (r.admin_note ? ' • ' + r.admin_note : '')
+        : (dh.holidayName || (dh.isSunday ? 'วันอาทิตย์' : ''));
+
+      return {
+        date: dh.date,
+        type: type,
+        text: text,
+        otText: otText,
+        first_in: r ? (r.first_in || '') : '',
+        last_out: r ? (r.last_out || '') : '',
+        admin_note: r ? (r.admin_note || '') : '',
+        isFuture: isFuture,
+        tip: tip
+      };
+    });
+
+    return {
+      no: idx + 1,
+      employee_id: empId,
+      code: emp.code || empId,
+      name: emp.name,
+      nickname: emp.nickname || emp.name,
+      cells: cells
+    };
+  });
+
+  return { yearMonth: yearMonth, dayHeaders: dayHeaders, rows: rows };
+}
+
 /* ================= Export CSV (Excel Time Clock + Leave/OT Summary) ================= */
 
 function csvEscape(v) {

@@ -178,6 +178,11 @@ function adminGetIndividualTimesheet(adminSecret, employeeId, yearMonth) {
   return getIndividualTimesheet(employeeId, yearMonth);
 }
 
+function adminGetMonthlyMatrix(adminSecret, yearMonth) {
+  verifyAdminSecret(adminSecret);
+  return getMonthlyMatrix(yearMonth);
+}
+
 function adminCorrectAttendance(adminSecret, workDate, employeeId, firstIn, lastOut, adminNote, reason) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => adminCorrectDaily(workDate, employeeId, firstIn, lastOut, adminNote, reason, 'ADMIN'));

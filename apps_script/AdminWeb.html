@@ -129,6 +129,26 @@
     .callout.warn { background: var(--amber-soft); color: #78350f; }
     code { background: #f1f5f9; padding: 1px 6px; border-radius: 6px; font-size: 12.5px; }
 
+    .matrix-tbl { border-collapse: collapse; font-size: 11.5px; width: max-content; min-width: 100%; }
+    .matrix-tbl th, .matrix-tbl td { border: 1px solid #cbd5e1; padding: 4px 3px; text-align: center; min-width: 44px; }
+    .matrix-tbl thead th { background: #1e3a8a; color: #fff; font-weight: 600; position: sticky; top: 0; z-index: 2; }
+    .matrix-tbl .sticky-col { position: sticky; left: 0; background: #fff; z-index: 3; text-align: left; padding: 5px 10px; min-width: 110px; font-weight: 600; box-shadow: 2px 0 4px rgba(0,0,0,.05); }
+    .matrix-tbl thead .sticky-col { background: #0f1f4b; color: #fff; z-index: 4; }
+    .mx-cell { cursor: pointer; line-height: 1.25; transition: filter .1s; }
+    .mx-cell:hover { filter: brightness(.93); }
+    .mx-normal { background: #ffffff; color: #15803d; font-weight: 700; }
+    .mx-sunday { background: #e2e8f0; color: #475569; }
+    .mx-holiday { background: #dcfce7; color: #166534; font-weight: 600; }
+    .mx-upcoming { background: #f8fafc; color: #cbd5e1; cursor: default; }
+    .mx-late { background: #fef08a; color: #854d0e; font-weight: 600; }
+    .mx-missed { background: #fed7aa; color: #9a3412; font-weight: 600; }
+    .mx-absent { background: #fca5a5; color: #991b1b; font-weight: 700; }
+    .mx-leave { background: #bae6fd; color: #075985; font-weight: 600; }
+    .mx-offsite { background: #e9d5ff; color: #6b21a8; font-weight: 600; }
+    .mx-ot { display: block; font-size: 10.5px; color: #047857; font-weight: 700; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; margin-bottom: 12px; }
+    .legend span { padding: 3px 9px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; }
+
     .loading-bar { position: fixed; top: 0; left: 0; height: 3px; width: 100%; z-index: 200; overflow: hidden; }
     .loading-bar::after { content: ''; position: absolute; left: -40%; width: 40%; height: 100%; background: linear-gradient(90deg, transparent, var(--brand-2), transparent); animation: slide 1s infinite; }
     @keyframes slide { to { left: 100%; } }
@@ -186,6 +206,7 @@
         <div><div class="brand-name">HomesteelKK</div><div class="brand-sub">ระบบเวลา ลา และโอที</div></div>
       </div>
       <button class="nav-item active" data-tab="overview"><span class="ico">📊</span>ภาพรวม & Exception</button>
+      <button class="nav-item" data-tab="matrix"><span class="ico">🗓️</span>ตารางเวลาทั้งเดือน</button>
       <button class="nav-item" data-tab="person"><span class="ico">👤</span>ตรวจสอบรายคน</button>
       <button class="nav-item" data-tab="pending"><span class="ico">⏳</span>อนุมัติ / รับทราบ <span class="count hidden" data-pending-count>0</span></button>
       <button class="nav-item" data-tab="import"><span class="ico">📥</span>นำเข้าเวลาสแกนนิ้ว</button>
@@ -220,6 +241,30 @@
             </div>
           </div>
           <div id="exceptionTable"></div>
+        </div>
+      </section>
+
+      <!-- Tab: Monthly Matrix -->
+      <section id="tab-matrix" class="hidden">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3 class="card-title">🗓️ ตารางเวลาทำงานทั้งเดือน (ทุกคน × วันที่ 1–31)</h3>
+              <div class="card-sub">เอาเมาส์ชี้เพื่อดูเวลาเข้า-ออก • คลิกที่ช่องใดก็ได้เพื่อแก้ไขเวลาทันที</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="loadMatrix()">🔄 รีเฟรชตาราง</button>
+          </div>
+          <div class="legend">
+            <span class="mx-normal">✓ ปกติ</span>
+            <span class="mx-late">สาย (นาที)</span>
+            <span class="mx-missed">ลืมสแกน</span>
+            <span class="mx-absent">ขาด</span>
+            <span class="mx-leave">ลา</span>
+            <span class="mx-offsite">นอก/แก้ไข</span>
+            <span class="mx-holiday">นักขัตฯ</span>
+            <span class="mx-sunday">หยุด</span>
+          </div>
+          <div id="matrixWrap" class="table-wrap" style="max-height:72vh; overflow:auto;"></div>
         </div>
       </section>
 
@@ -351,6 +396,7 @@
   <script>
     const TAB_META = {
       overview: ['ภาพรวม & Exception List', 'สรุปข้อมูลและเคสที่ควรตรวจสอบก่อนปิดงวด'],
+      matrix: ['ตารางเวลาทั้งเดือน', 'ภาพรวมการเข้า-ออกงานของทุกคนในหน้าเดียว แยกสีดูง่าย'],
       person: ['ตรวจสอบรายคน', 'เลือกพนักงานเพื่อตรวจเวลาเข้า-ออก ใบลา โอที และแก้ไขเวลา'],
       pending: ['อนุมัติ / รับทราบ', 'อนุมัติลาพักร้อน-โอที และกดรับทราบใบลากิจ-ลาป่วย'],
       import: ['นำเข้าเวลาสแกนนิ้ว', 'สำหรับช่วงที่ดึงข้อมูลแบบ Manual'],
@@ -449,6 +495,7 @@
         renderEmpSelect();
         renderOverview(res.overview);
         renderPending(res.pendingVacations, res.pendingOTs, res.unackLeaves);
+        if (STATE.currentTab === 'matrix') loadMatrix();
         if (STATE.currentTab === 'person') loadPerson();
       } catch (err) {
         if (fromLogin) {
@@ -466,8 +513,28 @@
       Object.keys(TAB_META).forEach(t => $('tab-' + t).classList.toggle('hidden', t !== tab));
       $('pageTitle').textContent = TAB_META[tab][0];
       $('pageSub').textContent = TAB_META[tab][1] + ' • ' + ymLabel($('monthPicker').value);
+      if (tab === 'matrix') loadMatrix();
       if (tab === 'person') loadPerson();
       if (tab === 'payroll') loadPayroll();
+    }
+
+    async function loadMatrix() {
+      try {
+        const res = await call('adminGetMonthlyMatrix', $('monthPicker').value);
+        if (!res.rows || !res.rows.length) {
+          $('matrixWrap').innerHTML = emptyState('🗓️', 'ยังไม่มีข้อมูลพนักงานหรือยังไม่ได้คำนวณเดือนนี้');
+          return;
+        }
+        const thDays = res.dayHeaders.map(d => `<th title="${esc(d.holidayName || d.date)}">${d.day}<br><span style="font-weight:400;opacity:.85;">${d.dow}</span></th>`).join('');
+        const body = res.rows.map(r => {
+          const tds = r.cells.map(c => {
+            const click = c.isFuture ? '' : `onclick="openCorrectModal('${esc(c.date)}','${esc(r.employee_id)}','${esc(r.name)}','${esc(c.first_in)}','${esc(c.last_out)}','${esc(c.admin_note)}')"`;
+            return `<td class="mx-cell mx-${c.type}" title="${esc(r.nickname)} (${esc(c.date)}): ${esc(c.tip)}" ${click}>${esc(c.text)}${c.otText ? `<span class="mx-ot">${esc(c.otText)}</span>` : ''}</td>`;
+          }).join('');
+          return `<tr><td class="sticky-col"><a href="#" onclick="openPerson('${esc(r.employee_id)}');return false;" style="color:inherit;text-decoration:none;">${r.no}. ${esc(r.nickname)}</a></td>${tds}</tr>`;
+        }).join('');
+        $('matrixWrap').innerHTML = `<table class="matrix-tbl"><thead><tr><th class="sticky-col">ชื่อเล่น</th>${thDays}</tr></thead><tbody>${body}</tbody></table>`;
+      } catch (err) { toast(err.message, 'error'); }
     }
 
     function statCard(icon, bg, label, val, unit, onClickCode) {
