@@ -250,3 +250,25 @@ function adminSavePaySlipPdf(adminSecret, htmlContent, fileName, yearMonth) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => savePaySlipPdfToDrive(htmlContent, fileName, yearMonth, 'ADMIN'));
 }
+
+/* ================= Settings & Holidays Management ================= */
+
+function adminGetHolidays(adminSecret) {
+  verifyAdminSecret(adminSecret);
+  return listHolidays();
+}
+
+function adminAddHoliday(adminSecret, holidayDate, holidayName) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => addHoliday(holidayDate, holidayName, 'ADMIN'));
+}
+
+function adminUpdateHoliday(adminSecret, oldDate, newDate, newName) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => updateHoliday(oldDate, newDate, newName, 'ADMIN'));
+}
+
+function adminDeleteHoliday(adminSecret, holidayDate) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => deleteHoliday(holidayDate, 'ADMIN'));
+}

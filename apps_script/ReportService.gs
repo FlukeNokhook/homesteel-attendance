@@ -913,3 +913,93 @@ function setPeriodStatus(yearMonth, newStatus, actor, reason) {
     { status: period.status }, updates, reason || ('เปลี่ยนสถานะงวดเป็น ' + st));
   return Object.assign({}, period, updates);
 }
+
+/* ================= Holidays Management (Dashboard Settings) ================= */
+
+function listHolidays() {
+  return repoReadAll(SHEETS.HOLIDAYS).rows
+    .filter(r => String(r.holiday_date || '').trim())
+    .map(r => ({
+      holiday_date: String(r.holiday_date || '').trim(),
+      holiday_name: String(r.holiday_name || '').trim()
+    }))
+    .sort((a, b) => a.holiday_date.localeCompare(b.holiday_date));
+}
+
+/**
+ * คำนวณ Attendance_Daily ใหม่เฉพาะเดือนที่มีข้อมูลคำนวณไว้แล้วและงวดยังไม่ถูกล็อก
+ */
+function safeRecomputeIfComputed(yearMonth) {
+  try {
+    if (!/^\d{4}-\d{2}$/.test(String(yearMonth || ''))) return false;
+    const period = repoFindPeriod(yearMonth);
+    if (period && String(period.status).toLowerCase() === 'locked') return false;
+    const hasRows = repoReadAll(SHEETS.ATTENDANCE_DAILY).rows
+      .some(r => String(r.work_date || '').indexOf(yearMonth) === 0);
+    if (!hasRows) return false;
+    recomputeDailyForMonth(yearMonth);
+    return true;
+  } catch (e) {
+    Logger.log('safeRecomputeIfComputed skip: ' + e.message);
+    return false;
+  }
+}
+
+function addHoliday(holidayDate, holidayName, actor) {
+  const dateStr = repoNormalizeDate(holidayDate);
+  const nameStr = String(holidayName || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) throw new Error('รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น yyyy-MM-dd)');
+  if (!nameStr) throw new Error('กรุณาระบุชื่อวันหยุดครับ');
+
+  const existing = repoReadAll(SHEETS.HOLIDAYS).rows.find(r => String(r.holiday_date || '').trim() === dateStr);
+  if (existing) throw new Error('วันที่ ' + dateStr + ' มีอยู่ในรายการวันหยุดแล้วครับ (สามารถกดแก้ไขแทนได้)');
+
+  repoAppendRow(SHEETS.HOLIDAYS, { holiday_date: dateStr, holiday_name: nameStr });
+  repoAppendAuditLog(actor || 'admin', 'ADD_HOLIDAY', SHEETS.HOLIDAYS, dateStr, null,
+    { holiday_date: dateStr, holiday_name: nameStr }, 'เพิ่มวันหยุดนักขัตฤกษ์จาก Dashboard');
+
+  const recomputed = safeRecomputeIfComputed(dateStr.slice(0, 7));
+  return { ok: true, recomputed: recomputed, holidays: listHolidays() };
+}
+
+function updateHoliday(oldDate, newDate, newName, actor) {
+  const oldStr = repoNormalizeDate(oldDate);
+  const newStr = repoNormalizeDate(newDate);
+  const nameStr = String(newName || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newStr)) throw new Error('รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น yyyy-MM-dd)');
+  if (!nameStr) throw new Error('กรุณาระบุชื่อวันหยุดครับ');
+
+  const rows = repoReadAll(SHEETS.HOLIDAYS).rows;
+  const target = rows.find(r => String(r.holiday_date || '').trim() === oldStr);
+  if (!target) throw new Error('ไม่พบวันหยุดวันที่ ' + oldStr + ' ในระบบครับ');
+
+  if (newStr !== oldStr && rows.some(r => String(r.holiday_date || '').trim() === newStr)) {
+    throw new Error('วันที่ ' + newStr + ' มีอยู่ในรายการวันหยุดแล้วครับ');
+  }
+
+  const before = { holiday_date: target.holiday_date, holiday_name: target.holiday_name };
+  const after = { holiday_date: newStr, holiday_name: nameStr };
+  repoUpdateRow(SHEETS.HOLIDAYS, target._rowIndex, after);
+  repoAppendAuditLog(actor || 'admin', 'UPDATE_HOLIDAY', SHEETS.HOLIDAYS, newStr, before, after, 'แก้ไขวันหยุดนักขัตฤกษ์จาก Dashboard');
+
+  const months = {};
+  months[oldStr.slice(0, 7)] = true;
+  months[newStr.slice(0, 7)] = true;
+  let recomputed = false;
+  Object.keys(months).forEach(ym => { if (safeRecomputeIfComputed(ym)) recomputed = true; });
+  return { ok: true, recomputed: recomputed, holidays: listHolidays() };
+}
+
+function deleteHoliday(holidayDate, actor) {
+  const dateStr = repoNormalizeDate(holidayDate);
+  const rows = repoReadAll(SHEETS.HOLIDAYS).rows;
+  const target = rows.find(r => String(r.holiday_date || '').trim() === dateStr);
+  if (!target) throw new Error('ไม่พบวันหยุดวันที่ ' + dateStr + ' ในระบบครับ');
+
+  repoDeleteRow(SHEETS.HOLIDAYS, target._rowIndex);
+  repoAppendAuditLog(actor || 'admin', 'DELETE_HOLIDAY', SHEETS.HOLIDAYS, dateStr,
+    { holiday_date: target.holiday_date, holiday_name: target.holiday_name }, null, 'ลบวันหยุดนักขัตฤกษ์จาก Dashboard');
+
+  const recomputed = safeRecomputeIfComputed(dateStr.slice(0, 7));
+  return { ok: true, recomputed: recomputed, holidays: listHolidays() };
+}

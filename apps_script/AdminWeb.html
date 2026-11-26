@@ -212,6 +212,7 @@
       <button class="nav-item" data-tab="import"><span class="ico">📥</span>นำเข้าเวลาสแกนนิ้ว</button>
       <button class="nav-item" data-tab="payroll"><span class="ico">💰</span>เงินเดือน & สลิป</button>
       <button class="nav-item" data-tab="close"><span class="ico">🔒</span>ปิดงวด & Export</button>
+      <button class="nav-item" data-tab="settings"><span class="ico">⚙️</span>ตั้งค่าระบบ</button>
       <div class="sidebar-foot">
         <button class="nav-item" onclick="logout()"><span class="ico">↩</span>ออกจากระบบ</button>
       </div>
@@ -379,15 +380,55 @@
           </div>
         </div>
       </section>
+
+      <!-- Tab: Settings -->
+      <section id="tab-settings" class="hidden">
+        <div class="callout info">
+          <span>💡</span>
+          <div>จัดการการตั้งค่าทั้งหมดได้จากหน้านี้โดยไม่ต้องเปิด Google Sheet — เมื่อเพิ่ม แก้ไข หรือลบ <b>วันหยุดนักขัตฤกษ์</b> ระบบจะคำนวณตารางเวลา (<code>Attendance_Daily</code>) ของเดือนนั้นให้อัตโนมัติทันทีครับ</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3 class="card-title">📅 วันหยุดนักขัตฤกษ์ (Holidays)</h3>
+              <div class="card-sub">ใช้กำหนดวันหยุดบริษัทในตารางเวลา การนับวันลาล่วงหน้า 3 วัน และการคิดเงินเดือน</div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <select id="holidayYearFilter" class="select" style="width:auto; min-width:130px;" onchange="renderHolidays()">
+                <option value="ALL">ทุกปี</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" onclick="loadHolidays()">🔄 รีเฟรช</button>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; padding:14px; background:#f8fafc; border:1px solid var(--border); border-radius:10px; margin-bottom:16px;">
+            <div style="flex:0 0 180px;">
+              <label class="card-sub" for="newHolidayDate" style="display:block; margin-bottom:4px;">วันที่</label>
+              <input type="date" id="newHolidayDate" class="input" />
+            </div>
+            <div style="flex:1 1 240px;">
+              <label class="card-sub" for="newHolidayName" style="display:block; margin-bottom:4px;">ชื่อวันหยุด</label>
+              <input type="text" id="newHolidayName" class="input" placeholder="เช่น วันปิยมหาราช, วันแรงงานแห่งชาติ" onkeydown="if(event.key==='Enter') addHolidayItem()" />
+            </div>
+            <div>
+              <button class="btn btn-primary" onclick="addHolidayItem()">➕ เพิ่มวันหยุด</button>
+            </div>
+          </div>
+
+          <div id="holidaysTable"></div>
+        </div>
+      </section>
     </main>
 
-    <nav class="mobile-nav" style="grid-template-columns:repeat(6,1fr);">
+    <nav class="mobile-nav" style="grid-template-columns:repeat(7,1fr);">
       <button class="active" data-tab="overview"><span class="ico">📊</span>ภาพรวม</button>
       <button data-tab="person"><span class="ico">👤</span>รายคน</button>
       <button data-tab="pending"><span class="ico">⏳</span>อนุมัติ<span class="dot hidden" data-pending-count>0</span></button>
       <button data-tab="import"><span class="ico">📥</span>นำเข้า</button>
       <button data-tab="payroll"><span class="ico">💰</span>เงินเดือน</button>
       <button data-tab="close"><span class="ico">🔒</span>ปิดงวด</button>
+      <button data-tab="settings"><span class="ico">⚙️</span>ตั้งค่า</button>
     </nav>
   </div>
 
@@ -401,7 +442,8 @@
       pending: ['อนุมัติ / รับทราบ', 'อนุมัติลาพักร้อน-โอที และกดรับทราบใบลากิจ-ลาป่วย'],
       import: ['นำเข้าเวลาสแกนนิ้ว', 'สำหรับช่วงที่ดึงข้อมูลแบบ Manual'],
       payroll: ['เงินเดือน & สลิป', 'เชื่อม Google Sheet เงินเดือน แก้ไขรายได้/รายการหัก และพิมพ์สลิป'],
-      close: ['ปิดงวด & Export', 'ส่งออกไฟล์เข้า Excel เงินเดือนและล็อกงวด']
+      close: ['ปิดงวด & Export', 'ส่งออกไฟล์เข้า Excel เงินเดือนและล็อกงวด'],
+      settings: ['ตั้งค่าระบบ', 'จัดการวันหยุดนักขัตฤกษ์และการตั้งค่าอื่นๆ ของระบบ']
     };
     const DOW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
     const MONTH_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -516,6 +558,7 @@
       if (tab === 'matrix') loadMatrix();
       if (tab === 'person') loadPerson();
       if (tab === 'payroll') loadPayroll();
+      if (tab === 'settings') loadHolidays();
     }
 
     async function loadMatrix() {
@@ -1374,6 +1417,130 @@
             </div>`,
           hideConfirm: true
         });
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    /* ================= Settings: Holidays ================= */
+    let HOLIDAYS_CACHE = [];
+
+    async function loadHolidays() {
+      try {
+        HOLIDAYS_CACHE = await call('adminGetHolidays') || [];
+        populateHolidayYears();
+        renderHolidays();
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    function populateHolidayYears() {
+      const sel = $('holidayYearFilter');
+      const prev = sel.value || 'ALL';
+      const years = new Set([String(new Date().getFullYear())]);
+      HOLIDAYS_CACHE.forEach(h => { if (h.holiday_date) years.add(h.holiday_date.slice(0, 4)); });
+      const sorted = Array.from(years).sort().reverse();
+      sel.innerHTML = `<option value="ALL">ทุกปี (${HOLIDAYS_CACHE.length} วัน)</option>` +
+        sorted.map(y => `<option value="${y}">ปี ${+y + 543} (${y})</option>`).join('');
+      if (prev === 'ALL' || years.has(prev)) sel.value = prev;
+    }
+
+    function thaiFullDate(ds) {
+      if (!ds) return '-';
+      const d = new Date(ds + 'T00:00:00');
+      return `${DOW[d.getDay()]} ${d.getDate()} ${MONTH_TH[d.getMonth()]} ${d.getFullYear() + 543}`;
+    }
+
+    function renderHolidays() {
+      const yf = $('holidayYearFilter').value || 'ALL';
+      const list = yf === 'ALL' ? HOLIDAYS_CACHE : HOLIDAYS_CACHE.filter(h => String(h.holiday_date).startsWith(yf));
+      if (!list.length) {
+        $('holidaysTable').innerHTML = emptyState('📅', 'ยังไม่มีวันหยุดนักขัตฤกษ์ในช่วงที่เลือก — เพิ่มได้จากฟอร์มด้านบนเลยครับ');
+        return;
+      }
+      $('holidaysTable').innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>วันที่</th><th>รหัสวันที่</th><th>ชื่อวันหยุด</th><th style="text-align:right;">จัดการ</th></tr></thead>
+        <tbody>${list.map(h => `
+          <tr>
+            <td><b>${esc(thaiFullDate(h.holiday_date))}</b></td>
+            <td class="mono">${esc(h.holiday_date)}</td>
+            <td>${esc(h.holiday_name)}</td>
+            <td style="text-align:right; white-space:nowrap;">
+              <button class="btn btn-soft-blue btn-sm" onclick="openEditHolidayModal('${esc(h.holiday_date)}','${esc(h.holiday_name)}')">✏️ แก้ไข</button>
+              <button class="btn btn-danger btn-sm" onclick="confirmDeleteHoliday('${esc(h.holiday_date)}','${esc(h.holiday_name)}')">🗑️ ลบ</button>
+            </td>
+          </tr>`).join('')}</tbody></table></div>`;
+    }
+
+    async function addHolidayItem() {
+      const d = $('newHolidayDate').value.trim();
+      const n = $('newHolidayName').value.trim();
+      if (!d) { toast('กรุณาเลือกวันที่ก่อนครับ', 'error'); return; }
+      if (!n) { toast('กรุณาระบุชื่อวันหยุดครับ', 'error'); return; }
+      try {
+        const res = await call('adminAddHoliday', d, n);
+        HOLIDAYS_CACHE = res.holidays || [];
+        $('newHolidayDate').value = '';
+        $('newHolidayName').value = '';
+        populateHolidayYears();
+        renderHolidays();
+        toast('เพิ่มวันหยุดเรียบร้อย' + (res.recomputed ? ' และอัปเดตตารางเวลาของเดือนนั้นแล้ว' : ''), 'success');
+        if (d.slice(0, 7) === $('monthPicker').value) loadInit();
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    function openEditHolidayModal(oldDate, oldName) {
+      const root = $('modalRoot');
+      root.innerHTML = `<div class="modal-bg"><div class="modal">
+        <h3>✏️ แก้ไขวันหยุดนักขัตฤกษ์</h3>
+        <div style="display:grid; gap:12px; margin-top:10px;">
+          <div>
+            <label class="card-sub" style="display:block; margin-bottom:4px;">วันที่</label>
+            <input type="date" id="editHolDate" class="input" value="${esc(oldDate)}" />
+          </div>
+          <div>
+            <label class="card-sub" style="display:block; margin-bottom:4px;">ชื่อวันหยุด</label>
+            <input type="text" id="editHolName" class="input" value="${esc(oldName)}" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" data-act="cancel">ยกเลิก</button>
+          <button class="btn btn-primary" data-act="ok">บันทึกการแก้ไข</button>
+        </div>
+      </div></div>`;
+      const close = () => { root.innerHTML = ''; };
+      root.querySelector('[data-act="cancel"]').onclick = close;
+      root.querySelector('.modal-bg').onclick = e => { if (e.target.classList.contains('modal-bg')) close(); };
+      root.querySelector('[data-act="ok"]').onclick = async () => {
+        const newDate = $('editHolDate').value.trim();
+        const newName = $('editHolName').value.trim();
+        if (!newDate) { toast('กรุณาเลือกวันที่ครับ', 'error'); return; }
+        if (!newName) { toast('กรุณาระบุชื่อวันหยุดครับ', 'error'); return; }
+        close();
+        try {
+          const res = await call('adminUpdateHoliday', oldDate, newDate, newName);
+          HOLIDAYS_CACHE = res.holidays || [];
+          populateHolidayYears();
+          renderHolidays();
+          toast('แก้ไขวันหยุดเรียบร้อย' + (res.recomputed ? ' และอัปเดตตารางเวลาของเดือนนั้นแล้ว' : ''), 'success');
+          const curYm = $('monthPicker').value;
+          if (oldDate.slice(0, 7) === curYm || newDate.slice(0, 7) === curYm) loadInit();
+        } catch (err) { toast(err.message, 'error'); }
+      };
+    }
+
+    async function confirmDeleteHoliday(holidayDate, holidayName) {
+      const ok = await modal({
+        title: '🗑️ ลบวันหยุดนักขัตฤกษ์',
+        body: `ต้องการลบ "${holidayName}" (${thaiFullDate(holidayDate)}) ใช่หรือไม่? หากเดือนนั้นมีการคำนวณเวลาไว้แล้ว ระบบจะคำนวณให้ใหม่อัตโนมัติ`,
+        confirmText: 'ลบวันหยุด',
+        confirmClass: 'btn-danger'
+      });
+      if (!ok) return;
+      try {
+        const res = await call('adminDeleteHoliday', holidayDate);
+        HOLIDAYS_CACHE = res.holidays || [];
+        populateHolidayYears();
+        renderHolidays();
+        toast('ลบวันหยุดเรียบร้อย' + (res.recomputed ? ' และอัปเดตตารางเวลาของเดือนนั้นแล้ว' : ''), 'success');
+        if (holidayDate.slice(0, 7) === $('monthPicker').value) loadInit();
       } catch (err) { toast(err.message, 'error'); }
     }
   </script>

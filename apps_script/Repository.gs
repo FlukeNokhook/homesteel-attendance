@@ -191,6 +191,13 @@ function repoUpdateRow(sheetName, rowIndex, updates) {
   }
 }
 
+function repoDeleteRow(sheetName, rowIndex) {
+  if (!rowIndex || rowIndex < 2) throw new Error('ไม่พบตำแหน่งแถวที่ต้องการลบ');
+  const sheet = repoGetMainDb().getSheetByName(sheetName);
+  if (!sheet) throw new Error('ไม่พบชีต ' + sheetName);
+  sheet.deleteRow(rowIndex);
+}
+
 /* ================= Cache (Employees / Settings / Holidays) ================= */
 
 function repoCacheGet(key, ttlSec, loader) {
