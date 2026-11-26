@@ -58,6 +58,43 @@ function repoGetRawSheet(year) {
   return sheet;
 }
 
+const THAI_MONTH_MAP = {
+  'ม.ค.': 1, 'ก.พ.': 2, 'มี.ค.': 3, 'เม.ย.': 4, 'พ.ค.': 5, 'มิ.ย.': 6,
+  'ก.ค.': 7, 'ส.ค.': 8, 'ก.ย.': 9, 'ต.ค.': 10, 'พ.ย.': 11, 'ธ.ค.': 12,
+  'มกราคม': 1, 'กุมภาพันธ์': 2, 'มีนาคม': 3, 'เมษายน': 4, 'พฤษภาคม': 5, 'มิถุนายน': 6,
+  'กรกฎาคม': 7, 'สิงหาคม': 8, 'กันยายน': 9, 'ตุลาคม': 10, 'พฤศจิกายน': 11, 'ธันวาคม': 12
+};
+
+/**
+ * แปลงวันที่ทุกรูปแบบ (Date, yyyy-MM-dd, yyyy/MM/dd, "4 พ.ค. 26", "15/08/2569") เป็น "yyyy-MM-dd"
+ */
+function repoNormalizeDate(val) {
+  if (val instanceof Date) return Utilities.formatDate(val, TIMEZONE, 'yyyy-MM-dd');
+  const s = String(val || '').trim();
+  if (!s) return '';
+  let m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+  if (m) {
+    let y = parseInt(m[1], 10);
+    if (y > 2400) y -= 543;
+    return y + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[3]).padStart(2, '0');
+  }
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) {
+    let y = parseInt(m[3], 10);
+    if (y < 100) y += (y >= 50 ? 2500 - 543 : 2000);
+    else if (y > 2400) y -= 543;
+    return y + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+  }
+  m = s.match(/^(\d{1,2})\s+([^\s]+)\s+(\d{2,4})/);
+  if (m && THAI_MONTH_MAP[m[2]]) {
+    let y = parseInt(m[3], 10);
+    if (y < 100) y += (y >= 50 ? 2500 - 543 : 2000);
+    else if (y > 2400) y -= 543;
+    return y + '-' + String(THAI_MONTH_MAP[m[2]]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+  }
+  return s;
+}
+
 function repoFormatCellDate(dateObj, headerName) {
   if (DATE_COLS.indexOf(headerName) !== -1) return Utilities.formatDate(dateObj, TIMEZONE, 'yyyy-MM-dd');
   if (TIME_COLS.indexOf(headerName) !== -1) return Utilities.formatDate(dateObj, TIMEZONE, 'HH:mm');
@@ -80,7 +117,13 @@ function repoReadSheet(sheet) {
     for (let c = 0; c < headers.length; c++) {
       const val = values[r][c];
       if (val !== '' && val !== null && val !== undefined) hasValue = true;
-      obj[headers[c]] = val instanceof Date ? repoFormatCellDate(val, headers[c]) : val;
+      if (val instanceof Date) {
+        obj[headers[c]] = repoFormatCellDate(val, headers[c]);
+      } else if (DATE_COLS.indexOf(headers[c]) !== -1 && val) {
+        obj[headers[c]] = repoNormalizeDate(val);
+      } else {
+        obj[headers[c]] = val;
+      }
     }
     if (hasValue) rows.push(obj);
   }
