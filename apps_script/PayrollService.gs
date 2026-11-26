@@ -18,6 +18,11 @@ const CLEAN_CALC_HEADERS = [
   'รายได้สุทธิ', 'ประกันสังคม', 'ภาษี (PND 1)', 'ยอดจ่ายเงินสุทธิ', 'ธนาคาร', 'เลขที่บัญชี'
 ];
 
+function normEmpCode(v) {
+  const s = String(v === undefined || v === null ? '' : v).trim();
+  return s.replace(/^0+/, '') || s;
+}
+
 function getPayrollDb() {
   const cfg = getAppConfig();
   if (!cfg.PAYROLL_SHEET_ID) {
@@ -113,6 +118,8 @@ function setupCleanPayrollSheet(actor) {
   });
 
   if (rows.length) {
+    sheet.getRange(2, 1, rows.length, 1).setNumberFormat('@');
+    sheet.getRange(2, 33, rows.length, 1).setNumberFormat('@');
     sheet.getRange(2, 1, rows.length, CLEAN_CALC_HEADERS.length).setValues(rows);
     sheet.getRange(2, 6, rows.length, 1).setNumberFormat('#,##0.00');
     sheet.getRange(2, 12, rows.length, 9).setNumberFormat('#,##0.00');
@@ -179,7 +186,7 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
       off ? '0:00' : '1:00', r.first_in || '', r.last_out || ''
     ]);
 
-    const key = String(r.code || r.employee_id);
+    const key = normEmpCode(r.code || r.employee_id);
     if (!byEmp[key]) {
       byEmp[key] = { workDays: 0, workMin: 0, otHours: 0, lateMin: 0, absentMin: 0, leaveHours: 0 };
     }
@@ -206,12 +213,12 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
     const existingCodes = new Set();
     if (calcSheet.getLastRow() >= 2) {
       calcSheet.getRange(2, 1, calcSheet.getLastRow() - 1, 1).getValues().forEach(c => {
-        const k = String(c[0] || '').trim();
+        const k = normEmpCode(c[0]);
         if (k) existingCodes.add(k);
       });
     }
     const activeEmps = repoGetEmployees().filter(isActiveEmp);
-    const missingEmps = activeEmps.filter(e => !existingCodes.has(String(e.code || e.employee_id).trim()));
+    const missingEmps = activeEmps.filter(e => !existingCodes.has(normEmpCode(e.code || e.employee_id)));
     if (missingEmps.length) {
       const startRow = calcSheet.getLastRow() + 1;
       const newRows = missingEmps.map((e, idx) => {
@@ -239,6 +246,8 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
       if (startRow + newRows.length - 1 > calcSheet.getMaxRows()) {
         calcSheet.insertRowsAfter(calcSheet.getMaxRows(), newRows.length);
       }
+      calcSheet.getRange(startRow, 1, newRows.length, 1).setNumberFormat('@');
+      calcSheet.getRange(startRow, 33, newRows.length, 1).setNumberFormat('@');
       calcSheet.getRange(startRow, 1, newRows.length, CLEAN_CALC_HEADERS.length).setValues(newRows);
       calcSheet.getRange(startRow, 6, newRows.length, 1).setNumberFormat('#,##0.00');
       calcSheet.getRange(startRow, 12, newRows.length, 9).setNumberFormat('#,##0.00');
@@ -254,7 +263,7 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
       const diligenceCol = calcSheet.getRange(2, 16, lastRow - 1, 1).getValues(); // P
 
       for (let i = 0; i < codes.length; i++) {
-        const code = String(codes[i][0] || '').trim();
+        const code = normEmpCode(codes[i][0]);
         const st = byEmp[code];
         if (!st) continue;
         statsGrid[i] = [
