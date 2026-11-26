@@ -13,7 +13,9 @@ const SHEETS = {
   AUDIT_LOG: 'Audit_Log',
   PAYROLL_PERIOD: 'Payroll_Period',
   SETTINGS: 'Settings',
-  HOLIDAYS: 'Holidays'
+  HOLIDAYS: 'Holidays',
+  FRAME_FINDING: 'Frame_Finding',
+  SITE_MEASURE: 'Site_Measure'
 };
 
 const TIMEZONE = 'Asia/Bangkok';

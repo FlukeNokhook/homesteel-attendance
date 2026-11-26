@@ -148,6 +148,18 @@
     .mx-ot { display: block; font-size: 10.5px; color: #047857; font-weight: 700; }
     .legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; margin-bottom: 12px; }
     .legend span { padding: 3px 9px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; }
+    .subtabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .subtab-btn { border: 1px solid var(--border); background: var(--surface); color: var(--text-2); padding: 9px 16px; border-radius: 10px; font-weight: 600; font-size: 13.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all .15s; }
+    .subtab-btn:hover { border-color: var(--brand); color: var(--brand); }
+    .subtab-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); box-shadow: 0 2px 8px rgba(37,99,235,.22); }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .emp-sum-chip { background: var(--brand-soft); color: #1e3a8a; padding: 6px 12px; border-radius: 99px; font-size: 12.5px; font-weight: 600; }
+    .part-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .part-toggle { border: 1px solid var(--border); background: #fff; color: var(--text); padding: 5px 10px; border-radius: 8px; font-size: 12.5px; cursor: pointer; }
+    .part-toggle.on { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }
+    .part-share-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .part-share-item { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 5px 8px; font-size: 12.5px; }
+    .part-share-item input { width: 78px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; text-align: right; font-weight: 600; }
 
     .loading-bar { position: fixed; top: 0; left: 0; height: 3px; width: 100%; z-index: 200; overflow: hidden; }
     .loading-bar::after { content: ''; position: absolute; left: -40%; width: 40%; height: 100%; background: linear-gradient(90deg, transparent, var(--brand-2), transparent); animation: slide 1s infinite; }
@@ -332,22 +344,122 @@
 
       <!-- Tab: Payroll & Pay Slip -->
       <section id="tab-payroll" class="hidden">
-        <div class="card">
-          <div class="card-head">
-            <div>
-              <h3 class="card-title">💰 คำนวณเงินเดือน & พิมพ์สลิป (เชื่อม Google Sheet เงินเดือน)</h3>
-              <div id="payrollSub" class="card-sub">กรอกข้อมูลได้ทั้งใน Google Sheet และบนหน้านี้ ซิงก์กันทันที</div>
+        <div class="subtabs">
+          <button class="subtab-btn active" data-psub="summary" onclick="switchPayrollSub('summary')">💵 สรุปเงินเดือน & สลิป</button>
+          <button class="subtab-btn" data-psub="frame" onclick="switchPayrollSub('frame')">🏗️ ค่าหาโครง <span id="frameCountBadge" class="pill pill-blue" style="padding:1px 7px; font-size:11px;">0</span></button>
+          <button class="subtab-btn" data-psub="measure" onclick="switchPayrollSub('measure')">📏 ค่าวัดหน้างาน <span id="measureCountBadge" class="pill pill-blue" style="padding:1px 7px; font-size:11px;">0</span></button>
+        </div>
+
+        <!-- Sub-tab 1: Summary & Pay Slips -->
+        <div id="psub-summary">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3 class="card-title">💰 คำนวณเงินเดือน & พิมพ์สลิป (เชื่อม Google Sheet เงินเดือน)</h3>
+                <div id="payrollSub" class="card-sub">กรอกข้อมูลได้ทั้งใน Google Sheet และบนหน้านี้ ซิงก์กันทันที</div>
+              </div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn btn-primary btn-sm" onclick="syncToPayrollSheet()">📤 ส่งข้อมูลเข้า Calculation + Time Clock</button>
+                <button class="btn btn-ghost btn-sm" onclick="loadPayroll()">🔄 โหลดยอดล่าสุด</button>
+                <a id="openPayrollSheetLink" href="#" target="_blank" class="btn btn-soft-blue btn-sm hidden">📄 เปิด Google Sheet เงินเดือน</a>
+                <button class="btn btn-success btn-sm" onclick="printAllSlips()">🖨️ พิมพ์สลิปทั้งหมด</button>
+                <button class="btn btn-soft-green btn-sm" onclick="saveAllSlipsPdf()">📁 บันทึก PDF ทั้งหมดลง Drive</button>
+              </div>
             </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="btn btn-primary btn-sm" onclick="syncToPayrollSheet()">📤 ส่งข้อมูลเข้า Calculation + Time Clock</button>
-              <button class="btn btn-ghost btn-sm" onclick="loadPayroll()">🔄 โหลดยอดล่าสุด</button>
-              <a id="openPayrollSheetLink" href="#" target="_blank" class="btn btn-soft-blue btn-sm hidden">📄 เปิด Google Sheet เงินเดือน</a>
-              <button class="btn btn-success btn-sm" onclick="printAllSlips()">🖨️ พิมพ์สลิปทั้งหมด</button>
-              <button class="btn btn-soft-green btn-sm" onclick="saveAllSlipsPdf()">📁 บันทึก PDF ทั้งหมดลง Drive</button>
-            </div>
+            <div id="payrollStats" class="stats" style="margin-bottom:14px;"></div>
+            <div id="payrollTableWrap"></div>
           </div>
-          <div id="payrollStats" class="stats" style="margin-bottom:14px;"></div>
-          <div id="payrollTableWrap"></div>
+        </div>
+
+        <!-- Sub-tab 2: Frame Finding (ค่าหาโครง) -->
+        <div id="psub-frame" class="hidden">
+          <div class="callout info">
+            <span>🏗️</span>
+            <div>เรทอัตโนมัติ: ยอดขาย <b>1+</b> = 40 บ. • <b>50,000+</b> = 50 บ. • <b>100,000+</b> = 100 บ. • <b>150,000+</b> = 150 บ. • <b>200,000+</b> = 200 บ. (แก้ยอดเองได้) — บันทึกแล้วซิงก์เข้าคอลัมน์ <b>ค่าหาโครง (O)</b> ใน Calculation อัตโนมัติครับ</div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3 class="card-title">🏗️ บันทึกค่าหาโครง</h3>
+                <div class="card-sub">ผูกด้วยรหัสพนักงาน (code) ป้องกันชื่อซ้ำ • แยกเก็บประวัติตามเดือนอัตโนมัติ</div>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="loadBonuses()">🔄 รีเฟรช</button>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; align-items:end; padding:14px; background:#f8fafc; border:1px solid var(--border); border-radius:10px; margin-bottom:16px;">
+              <div style="grid-column:span 2;">
+                <label class="card-sub" style="display:block; margin-bottom:4px;">พนักงานที่หาโครง *</label>
+                <select id="ffEmp" class="select"></select>
+              </div>
+              <div>
+                <label class="card-sub" style="display:block; margin-bottom:4px;">เลขที่บิล</label>
+                <input type="text" id="ffBill" class="input" placeholder="เช่น IV6909-0012" />
+              </div>
+              <div style="grid-column:span 2;">
+                <label class="card-sub" style="display:block; margin-bottom:4px;">ชื่อลูกค้า / โครงการ *</label>
+                <input type="text" id="ffCustomer" class="input" placeholder="ระบุชื่อลูกค้า" />
+              </div>
+              <div>
+                <label class="card-sub" style="display:block; margin-bottom:4px;">ยอดขาย (บาท)</label>
+                <input type="number" id="ffSales" class="input" placeholder="0" min="0" step="0.01" oninput="autoCalcFrameFee()" />
+              </div>
+              <div>
+                <label class="card-sub" style="display:block; margin-bottom:4px;">ค่าหาโครง (บาท) *</label>
+                <input type="number" id="ffAmount" class="input" placeholder="คำนวณอัตโนมัติ" min="0" step="1" />
+              </div>
+              <div>
+                <button class="btn btn-primary btn-block" onclick="submitFrameFinding()">➕ บันทึกค่าหาโครง</button>
+              </div>
+            </div>
+            <div id="frameSummaryChips" class="chip-row"></div>
+            <div id="frameTableWrap"></div>
+          </div>
+        </div>
+
+        <!-- Sub-tab 3: Site Measure (ค่าวัดหน้างาน) -->
+        <div id="psub-measure" class="hidden">
+          <div class="callout info">
+            <span>📏</span>
+            <div>เรทอัตโนมัติ: ยอดขาย <b>1+</b> = 50 บ. • <b>20,000+</b> = 100 บ. • <b>100,000+</b> = 300 บ. • <b>1,000,000+</b> = 500 บ. — เลือกผู้ร่วมวัดหลายคนระบบหารเท่ากันให้ทันที (และปรับส่วนแบ่งรายคนเองได้) ซิงก์เข้าคอลัมน์ <b>ค่าวัดหน้างาน (N)</b> อัตโนมัติครับ</div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3 class="card-title">📏 บันทึกค่าวัดหน้างาน</h3>
+                <div class="card-sub">ผูกด้วยรหัสพนักงาน (code) • รองรับการหารหลายคนในบิลเดียว</div>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="loadBonuses()">🔄 รีเฟรช</button>
+            </div>
+            <div style="padding:14px; background:#f8fafc; border:1px solid var(--border); border-radius:10px; margin-bottom:16px;">
+              <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; align-items:end;">
+                <div>
+                  <label class="card-sub" style="display:block; margin-bottom:4px;">เลขที่บิล</label>
+                  <input type="text" id="smBill" class="input" placeholder="เช่น IV6909-0034" />
+                </div>
+                <div style="grid-column:span 2;">
+                  <label class="card-sub" style="display:block; margin-bottom:4px;">ชื่อลูกค้า / หน้างาน *</label>
+                  <input type="text" id="smCustomer" class="input" placeholder="ระบุชื่อลูกค้าหรือสถานที่" />
+                </div>
+                <div>
+                  <label class="card-sub" style="display:block; margin-bottom:4px;">ยอดขาย (บาท)</label>
+                  <input type="number" id="smSales" class="input" placeholder="0" min="0" step="0.01" oninput="autoCalcMeasureFee()" />
+                </div>
+                <div>
+                  <label class="card-sub" style="display:block; margin-bottom:4px;">ค่าวัดรวม (บาท) *</label>
+                  <input type="number" id="smTotal" class="input" placeholder="คำนวณอัตโนมัติ" min="0" step="1" oninput="splitMeasureShares()" />
+                </div>
+              </div>
+              <div style="margin-top:12px;">
+                <label class="card-sub" style="display:block;">คลิกเลือกพนักงานที่ไปวัดหน้างาน (เลือกได้หลายคน) *</label>
+                <div id="smEmpPicker" class="part-grid"></div>
+                <div id="smShareWrap" class="part-share-list"></div>
+              </div>
+              <div style="margin-top:12px; display:flex; justify-content:flex-end;">
+                <button class="btn btn-primary" onclick="submitSiteMeasure()">➕ บันทึกค่าวัดหน้างาน</button>
+              </div>
+            </div>
+            <div id="measureSummaryChips" class="chip-row"></div>
+            <div id="measureTableWrap"></div>
+          </div>
         </div>
       </section>
 
@@ -539,6 +651,7 @@
         renderPending(res.pendingVacations, res.pendingOTs, res.unackLeaves);
         if (STATE.currentTab === 'matrix') loadMatrix();
         if (STATE.currentTab === 'person') loadPerson();
+        if (STATE.currentTab === 'payroll') { loadPayroll(); loadBonuses(); }
       } catch (err) {
         if (fromLogin) {
           sessionStorage.removeItem('hs_admin');
@@ -557,7 +670,7 @@
       $('pageSub').textContent = TAB_META[tab][1] + ' • ' + ymLabel($('monthPicker').value);
       if (tab === 'matrix') loadMatrix();
       if (tab === 'person') loadPerson();
-      if (tab === 'payroll') loadPayroll();
+      if (tab === 'payroll') { loadPayroll(); loadBonuses(); }
       if (tab === 'settings') loadHolidays();
     }
 
@@ -1541,6 +1654,372 @@
         renderHolidays();
         toast('ลบวันหยุดเรียบร้อย' + (res.recomputed ? ' และอัปเดตตารางเวลาของเดือนนั้นแล้ว' : ''), 'success');
         if (holidayDate.slice(0, 7) === $('monthPicker').value) loadInit();
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    /* ================= Frame Finding (ค่าหาโครง) & Site Measure (ค่าวัดหน้างาน) ================= */
+    let BONUS_DATA = { frameFindings: [], siteMeasures: [], frameSummary: [], measureSummary: [] };
+    let SM_SELECTED = []; // [{ employee_id, label, amount }]
+
+    function switchPayrollSub(sub) {
+      document.querySelectorAll('.subtab-btn[data-psub]').forEach(b => b.classList.toggle('active', b.dataset.psub === sub));
+      ['summary', 'frame', 'measure'].forEach(s => $('psub-' + s).classList.toggle('hidden', s !== sub));
+      if (sub === 'summary') loadPayroll();
+      else { populateBonusEmpControls(); loadBonuses(); }
+    }
+
+    function empCodeLabel(e) {
+      return `${e.code || e.employee_id} - ${e.name}${e.nickname && e.nickname !== e.name ? ' (' + e.nickname + ')' : ''}`;
+    }
+
+    function populateBonusEmpControls() {
+      const emps = STATE.employees || [];
+      const sel = $('ffEmp');
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">-- เลือกพนักงาน --</option>' +
+        emps.map(e => `<option value="${esc(e.employee_id)}">${esc(empCodeLabel(e))}</option>`).join('');
+      if (prev && emps.some(e => String(e.employee_id) === prev)) sel.value = prev;
+
+      renderSmEmpPicker();
+    }
+
+    function calcFrameTierClient(sales) {
+      const s = Number(sales) || 0;
+      if (s >= 200000) return 200;
+      if (s >= 150000) return 150;
+      if (s >= 100000) return 100;
+      if (s >= 50000) return 50;
+      if (s >= 1) return 40;
+      return 0;
+    }
+
+    function calcMeasureTierClient(sales) {
+      const s = Number(sales) || 0;
+      if (s >= 1000000) return 500;
+      if (s >= 100000) return 300;
+      if (s >= 20000) return 100;
+      if (s >= 1) return 50;
+      return 0;
+    }
+
+    function autoCalcFrameFee() {
+      $('ffAmount').value = calcFrameTierClient($('ffSales').value);
+    }
+
+    function autoCalcMeasureFee() {
+      $('smTotal').value = calcMeasureTierClient($('smSales').value);
+      splitMeasureShares();
+    }
+
+    function renderSmEmpPicker() {
+      const emps = STATE.employees || [];
+      const selectedIds = new Set(SM_SELECTED.map(p => String(p.employee_id)));
+      $('smEmpPicker').innerHTML = emps.map(e => {
+        const id = String(e.employee_id);
+        const on = selectedIds.has(id) ? 'on' : '';
+        return `<button type="button" class="part-toggle ${on}" onclick="toggleSmEmp('${esc(id)}')">${esc(e.code || id)}-${esc(e.nickname || e.name)}</button>`;
+      }).join('');
+      renderSmShares();
+    }
+
+    function toggleSmEmp(empId) {
+      const idx = SM_SELECTED.findIndex(p => String(p.employee_id) === String(empId));
+      if (idx >= 0) {
+        SM_SELECTED.splice(idx, 1);
+      } else {
+        const e = (STATE.employees || []).find(x => String(x.employee_id) === String(empId));
+        if (!e) return;
+        SM_SELECTED.push({ employee_id: String(e.employee_id), label: `${e.code || e.employee_id}-${e.nickname || e.name}`, amount: 0 });
+      }
+      splitMeasureShares();
+      renderSmEmpPicker();
+    }
+
+    function splitMeasureShares() {
+      const total = Number($('smTotal').value) || 0;
+      const n = SM_SELECTED.length;
+      if (n > 0) {
+        const base = Math.round((total / n) * 100) / 100;
+        SM_SELECTED.forEach((p, i) => {
+          p.amount = (i === n - 1) ? Math.round((total - base * (n - 1)) * 100) / 100 : base;
+        });
+      }
+      renderSmShares();
+    }
+
+    function renderSmShares() {
+      if (!SM_SELECTED.length) {
+        $('smShareWrap').innerHTML = '<span class="card-sub">ยังไม่ได้เลือกพนักงานที่ไปวัดหน้างาน</span>';
+        return;
+      }
+      const sum = Math.round(SM_SELECTED.reduce((s, p) => s + (Number(p.amount) || 0), 0) * 100) / 100;
+      $('smShareWrap').innerHTML = SM_SELECTED.map((p, idx) => `
+        <div class="part-share-item">
+          <span><b>${esc(p.label)}</b></span>
+          <input type="number" min="0" step="0.5" value="${p.amount}" oninput="SM_SELECTED[${idx}].amount=Number(this.value)||0; updateSmShareSum()" />
+          <span>บ.</span>
+        </div>`).join('') + `<span id="smShareSum" class="card-sub" style="align-self:center; margin-left:4px;">รวมส่วนแบ่ง: <b>${fmtBaht(sum)}</b> บ.</span>`;
+    }
+
+    function updateSmShareSum() {
+      const sum = Math.round(SM_SELECTED.reduce((s, p) => s + (Number(p.amount) || 0), 0) * 100) / 100;
+      const el = $('smShareSum');
+      if (el) el.innerHTML = `รวมส่วนแบ่ง: <b>${fmtBaht(sum)}</b> บ.`;
+    }
+
+    async function loadBonuses() {
+      populateBonusEmpControls();
+      try {
+        BONUS_DATA = await call('adminGetMonthBonuses', $('monthPicker').value) || BONUS_DATA;
+        renderBonuses();
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    function renderBonuses() {
+      const ff = BONUS_DATA.frameFindings || [];
+      const sm = BONUS_DATA.siteMeasures || [];
+      $('frameCountBadge').textContent = ff.length;
+      $('measureCountBadge').textContent = sm.length;
+
+      // Frame Finding summary chips + table
+      const fSum = BONUS_DATA.frameSummary || [];
+      const fTotalAll = ff.reduce((s, r) => s + Number(r.amount || 0), 0);
+      $('frameSummaryChips').innerHTML = fSum.length
+        ? `<span class="emp-sum-chip" style="background:var(--green-soft); color:#166534;">รวมทั้งหมด: ${ff.length} บิล • ${fmtBaht(fTotalAll)} บ.</span>` +
+          fSum.map(x => `<span class="emp-sum-chip">${esc(x.code)}-${esc(x.nickname || x.name)}: ${x.count} บิล • ${fmtBaht(x.total)} บ.</span>`).join('')
+        : '';
+
+      $('frameTableWrap').innerHTML = ff.length ? `<div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>รหัส - พนักงาน</th><th>เลขที่บิล</th><th>ชื่อลูกค้า</th><th class="num">ยอดขาย (บ.)</th><th class="num">ค่าหาโครง (บ.)</th><th style="text-align:right;">จัดการ</th></tr></thead>
+        <tbody>${ff.map((r, i) => `<tr>
+          <td>${i + 1}</td>
+          <td><span class="mono">${esc(r.code)}</span> • <b>${esc(r.name)}</b>${r.nickname && r.nickname !== r.name ? ` <span class="card-sub">(${esc(r.nickname)})</span>` : ''}</td>
+          <td class="mono">${esc(r.bill_no || '-')}</td>
+          <td>${esc(r.customer_name || '-')}</td>
+          <td class="num">${fmtBaht(r.sales_amount)}</td>
+          <td class="num"><b>${fmtBaht(r.amount)}</b></td>
+          <td style="text-align:right; white-space:nowrap;">
+            <button class="btn btn-soft-blue btn-sm" onclick="openEditFrameModal('${esc(r.record_id)}')">✏️ แก้ไข</button>
+            <button class="btn btn-danger btn-sm" onclick="confirmDeleteFrame('${esc(r.record_id)}')">🗑️ ลบ</button>
+          </td>
+        </tr>`).join('')}</tbody></table></div>` : emptyState('🏗️', 'ยังไม่มีรายการค่าหาโครงในเดือนนี้');
+
+      // Site Measure summary chips + table
+      const mSum = BONUS_DATA.measureSummary || [];
+      const mTotalAll = sm.reduce((s, r) => s + Number(r.total_amount || 0), 0);
+      $('measureSummaryChips').innerHTML = mSum.length
+        ? `<span class="emp-sum-chip" style="background:var(--green-soft); color:#166534;">รวมทั้งหมด: ${sm.length} บิล • ${fmtBaht(mTotalAll)} บ.</span>` +
+          mSum.map(x => `<span class="emp-sum-chip">${esc(x.code)}-${esc(x.nickname || x.name)}: ${x.count} บิล • ${fmtBaht(x.total)} บ.</span>`).join('')
+        : '';
+
+      $('measureTableWrap').innerHTML = sm.length ? `<div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>เลขที่บิล</th><th>ชื่อลูกค้า / หน้างาน</th><th class="num">ยอดขาย (บ.)</th><th class="num">ค่าวัดรวม (บ.)</th><th>ผู้ร่วมวัด & ส่วนแบ่ง</th><th style="text-align:right;">จัดการ</th></tr></thead>
+        <tbody>${sm.map((r, i) => `<tr>
+          <td>${i + 1}</td>
+          <td class="mono">${esc(r.bill_no || '-')}</td>
+          <td>${esc(r.customer_name || '-')}</td>
+          <td class="num">${fmtBaht(r.sales_amount)}</td>
+          <td class="num"><b>${fmtBaht(r.total_amount)}</b></td>
+          <td style="font-size:12.5px;">${esc(r.participants_summary || '-')}</td>
+          <td style="text-align:right; white-space:nowrap;">
+            <button class="btn btn-soft-blue btn-sm" onclick="openEditMeasureModal('${esc(r.record_id)}')">✏️ แก้ไข</button>
+            <button class="btn btn-danger btn-sm" onclick="confirmDeleteMeasure('${esc(r.record_id)}')">🗑️ ลบ</button>
+          </td>
+        </tr>`).join('')}</tbody></table></div>` : emptyState('📏', 'ยังไม่มีรายการค่าวัดหน้างานในเดือนนี้');
+    }
+
+    async function submitFrameFinding() {
+      const empId = $('ffEmp').value;
+      const bill = $('ffBill').value.trim();
+      const cust = $('ffCustomer').value.trim();
+      const sales = $('ffSales').value;
+      const amt = $('ffAmount').value;
+      if (!empId) { toast('กรุณาเลือกพนักงานที่หาโครงครับ', 'error'); return; }
+      if (!cust && !bill) { toast('กรุณาระบุเลขที่บิลหรือชื่อลูกค้าครับ', 'error'); return; }
+      try {
+        const res = await call('adminAddFrameFinding', {
+          year_month: $('monthPicker').value,
+          employee_id: empId, bill_no: bill, customer_name: cust,
+          sales_amount: Number(sales) || 0, amount: amt !== '' ? Number(amt) : ''
+        });
+        BONUS_DATA = res.data || BONUS_DATA;
+        $('ffBill').value = ''; $('ffCustomer').value = ''; $('ffSales').value = ''; $('ffAmount').value = '';
+        renderBonuses();
+        toast('บันทึกค่าหาโครงเรียบร้อย' + (res.synced ? ' และอัปเดตเข้าชีต Calculation แล้ว' : ''), 'success');
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    function openEditFrameModal(recordId) {
+      const r = (BONUS_DATA.frameFindings || []).find(x => x.record_id === recordId);
+      if (!r) return;
+      const emps = STATE.employees || [];
+      const opts = emps.map(e => `<option value="${esc(e.employee_id)}" ${String(e.employee_id) === String(r.employee_id) ? 'selected' : ''}>${esc(empCodeLabel(e))}</option>`).join('');
+      const root = $('modalRoot');
+      root.innerHTML = `<div class="modal-bg"><div class="modal">
+        <h3>✏️ แก้ไขรายการค่าหาโครง</h3>
+        <div style="display:grid; gap:10px; margin-top:10px;">
+          <div><label class="card-sub">พนักงาน</label><select id="effEmp" class="select">${opts}</select></div>
+          <div class="grid-2">
+            <div><label class="card-sub">เลขที่บิล</label><input id="effBill" class="input" value="${esc(r.bill_no)}" /></div>
+            <div><label class="card-sub">ยอดขาย (บ.)</label><input id="effSales" type="number" class="input" value="${r.sales_amount}" oninput="$('effAmt').value=calcFrameTierClient(this.value)" /></div>
+          </div>
+          <div><label class="card-sub">ชื่อลูกค้า</label><input id="effCust" class="input" value="${esc(r.customer_name)}" /></div>
+          <div><label class="card-sub">ค่าหาโครง (บ.)</label><input id="effAmt" type="number" class="input" value="${r.amount}" /></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" data-act="cancel">ยกเลิก</button>
+          <button class="btn btn-primary" data-act="ok">บันทึกการแก้ไข</button>
+        </div>
+      </div></div>`;
+      const close = () => { root.innerHTML = ''; };
+      root.querySelector('[data-act="cancel"]').onclick = close;
+      root.querySelector('.modal-bg').onclick = e => { if (e.target.classList.contains('modal-bg')) close(); };
+      root.querySelector('[data-act="ok"]').onclick = async () => {
+        const payload = {
+          employee_id: $('effEmp').value, bill_no: $('effBill').value.trim(),
+          customer_name: $('effCust').value.trim(), sales_amount: Number($('effSales').value) || 0,
+          amount: Number($('effAmt').value) || 0
+        };
+        close();
+        try {
+          const res = await call('adminUpdateFrameFinding', recordId, payload);
+          BONUS_DATA = res.data || BONUS_DATA;
+          renderBonuses();
+          toast('แก้ไขค่าหาโครงเรียบร้อย' + (res.synced ? ' และอัปเดตเข้า Calculation แล้ว' : ''), 'success');
+        } catch (err) { toast(err.message, 'error'); }
+      };
+    }
+
+    async function confirmDeleteFrame(recordId) {
+      const ok = await modal({ title: '🗑️ ลบรายการค่าหาโครง', body: 'ต้องการลบรายการนี้และอัปเดตยอดใน Calculation ใช่หรือไม่?', confirmText: 'ลบรายการ', confirmClass: 'btn-danger' });
+      if (!ok) return;
+      try {
+        const res = await call('adminDeleteFrameFinding', recordId);
+        BONUS_DATA = res.data || BONUS_DATA;
+        renderBonuses();
+        toast('ลบรายการค่าหาโครงเรียบร้อย' + (res.synced ? ' และอัปเดตเข้า Calculation แล้ว' : ''), 'success');
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    async function submitSiteMeasure() {
+      const bill = $('smBill').value.trim();
+      const cust = $('smCustomer').value.trim();
+      const sales = Number($('smSales').value) || 0;
+      if (!cust && !bill) { toast('กรุณาระบุเลขที่บิลหรือชื่อลูกค้าครับ', 'error'); return; }
+      if (!SM_SELECTED.length) { toast('กรุณาคลิกเลือกพนักงานที่ไปวัดหน้างานอย่างน้อย 1 คนครับ', 'error'); return; }
+      const total = Math.round(SM_SELECTED.reduce((s, p) => s + (Number(p.amount) || 0), 0) * 100) / 100;
+      try {
+        const res = await call('adminAddSiteMeasure', {
+          year_month: $('monthPicker').value,
+          bill_no: bill, customer_name: cust, sales_amount: sales, total_amount: total,
+          participants: SM_SELECTED.map(p => ({ employee_id: p.employee_id, amount: Number(p.amount) || 0 }))
+        });
+        BONUS_DATA = res.data || BONUS_DATA;
+        $('smBill').value = ''; $('smCustomer').value = ''; $('smSales').value = ''; $('smTotal').value = '';
+        SM_SELECTED = [];
+        renderSmEmpPicker();
+        renderBonuses();
+        toast('บันทึกค่าวัดหน้างานเรียบร้อย' + (res.synced ? ' และอัปเดตเข้าชีต Calculation แล้ว' : ''), 'success');
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    let EDIT_SM_PARTS = [];
+    function openEditMeasureModal(recordId) {
+      const r = (BONUS_DATA.siteMeasures || []).find(x => x.record_id === recordId);
+      if (!r) return;
+      EDIT_SM_PARTS = (r.participants || []).map(p => ({
+        employee_id: String(p.employee_id), label: `${p.code || p.employee_id}-${p.nickname || p.name}`, amount: Number(p.amount) || 0
+      }));
+      const root = $('modalRoot');
+      root.innerHTML = `<div class="modal-bg"><div class="modal wide">
+        <h3>✏️ แก้ไขรายการค่าวัดหน้างาน</h3>
+        <div style="display:grid; gap:10px; margin-top:10px;">
+          <div class="grid-2">
+            <div><label class="card-sub">เลขที่บิล</label><input id="esmBill" class="input" value="${esc(r.bill_no)}" /></div>
+            <div><label class="card-sub">ยอดขาย (บ.)</label><input id="esmSales" type="number" class="input" value="${r.sales_amount}" oninput="$('esmTotal').value=calcMeasureTierClient(this.value); splitEditSmShares()" /></div>
+          </div>
+          <div class="grid-2">
+            <div><label class="card-sub">ชื่อลูกค้า / หน้างาน</label><input id="esmCust" class="input" value="${esc(r.customer_name)}" /></div>
+            <div><label class="card-sub">ค่าวัดรวม (บ.)</label><input id="esmTotal" type="number" class="input" value="${r.total_amount}" oninput="splitEditSmShares()" /></div>
+          </div>
+          <div>
+            <label class="card-sub">ผู้ร่วมวัดหน้างาน</label>
+            <div id="esmEmpPicker" class="part-grid"></div>
+            <div id="esmShareWrap" class="part-share-list"></div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" data-act="cancel">ยกเลิก</button>
+          <button class="btn btn-primary" data-act="ok">บันทึกการแก้ไข</button>
+        </div>
+      </div></div>`;
+      renderEditSmPicker();
+      const close = () => { root.innerHTML = ''; };
+      root.querySelector('[data-act="cancel"]').onclick = close;
+      root.querySelector('.modal-bg').onclick = e => { if (e.target.classList.contains('modal-bg')) close(); };
+      root.querySelector('[data-act="ok"]').onclick = async () => {
+        if (!EDIT_SM_PARTS.length) { toast('กรุณาเลือกพนักงานอย่างน้อย 1 คนครับ', 'error'); return; }
+        const total = Math.round(EDIT_SM_PARTS.reduce((s, p) => s + (Number(p.amount) || 0), 0) * 100) / 100;
+        const payload = {
+          bill_no: $('esmBill').value.trim(), customer_name: $('esmCust').value.trim(),
+          sales_amount: Number($('esmSales').value) || 0, total_amount: total,
+          participants: EDIT_SM_PARTS.map(p => ({ employee_id: p.employee_id, amount: Number(p.amount) || 0 }))
+        };
+        close();
+        try {
+          const res = await call('adminUpdateSiteMeasure', recordId, payload);
+          BONUS_DATA = res.data || BONUS_DATA;
+          renderBonuses();
+          toast('แก้ไขค่าวัดหน้างานเรียบร้อย' + (res.synced ? ' และอัปเดตเข้า Calculation แล้ว' : ''), 'success');
+        } catch (err) { toast(err.message, 'error'); }
+      };
+    }
+
+    function renderEditSmPicker() {
+      const emps = STATE.employees || [];
+      const ids = new Set(EDIT_SM_PARTS.map(p => String(p.employee_id)));
+      $('esmEmpPicker').innerHTML = emps.map(e => {
+        const id = String(e.employee_id);
+        return `<button type="button" class="part-toggle ${ids.has(id) ? 'on' : ''}" onclick="toggleEditSmEmp('${esc(id)}')">${esc(e.code || id)}-${esc(e.nickname || e.name)}</button>`;
+      }).join('');
+      $('esmShareWrap').innerHTML = EDIT_SM_PARTS.map((p, idx) => `
+        <div class="part-share-item">
+          <span><b>${esc(p.label)}</b></span>
+          <input type="number" min="0" step="0.5" value="${p.amount}" oninput="EDIT_SM_PARTS[${idx}].amount=Number(this.value)||0" />
+          <span>บ.</span>
+        </div>`).join('');
+    }
+
+    function toggleEditSmEmp(empId) {
+      const idx = EDIT_SM_PARTS.findIndex(p => String(p.employee_id) === String(empId));
+      if (idx >= 0) EDIT_SM_PARTS.splice(idx, 1);
+      else {
+        const e = (STATE.employees || []).find(x => String(x.employee_id) === String(empId));
+        if (e) EDIT_SM_PARTS.push({ employee_id: String(e.employee_id), label: `${e.code || e.employee_id}-${e.nickname || e.name}`, amount: 0 });
+      }
+      splitEditSmShares();
+    }
+
+    function splitEditSmShares() {
+      const total = Number($('esmTotal').value) || 0;
+      const n = EDIT_SM_PARTS.length;
+      if (n > 0) {
+        const base = Math.round((total / n) * 100) / 100;
+        EDIT_SM_PARTS.forEach((p, i) => {
+          p.amount = (i === n - 1) ? Math.round((total - base * (n - 1)) * 100) / 100 : base;
+        });
+      }
+      renderEditSmPicker();
+    }
+
+    async function confirmDeleteMeasure(recordId) {
+      const ok = await modal({ title: '🗑️ ลบรายการค่าวัดหน้างาน', body: 'ต้องการลบรายการนี้และอัปเดตยอดใน Calculation ใช่หรือไม่?', confirmText: 'ลบรายการ', confirmClass: 'btn-danger' });
+      if (!ok) return;
+      try {
+        const res = await call('adminDeleteSiteMeasure', recordId);
+        BONUS_DATA = res.data || BONUS_DATA;
+        renderBonuses();
+        toast('ลบรายการค่าวัดหน้างานเรียบร้อย' + (res.synced ? ' และอัปเดตเข้า Calculation แล้ว' : ''), 'success');
       } catch (err) { toast(err.message, 'error'); }
     }
   </script>

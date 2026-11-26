@@ -99,7 +99,7 @@ function setupCleanPayrollSheet(actor) {
       `=ROUND(I${r}*(F${r}/240)*1.5, 2)`,
       `=IFERROR(VLOOKUP(C${r}, 'ค่าคอมฯ'!X:AA, 4, 0), 0)`,
       0,
-      `=IFERROR(SUMIF('ค่าหาโครง'!B:B, C${r}, 'ค่าหาโครง'!F:F), 0)`,
+      0,
       0,
       old.position_allowance || 0,
       old.phone_allowance || 0,
@@ -229,7 +229,7 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
           `=ROUND(I${r}*(F${r}/240)*1.5, 2)`,
           `=IFERROR(VLOOKUP(C${r}, 'ค่าคอมฯ'!X:AA, 4, 0), 0)`,
           0,
-          `=IFERROR(SUMIF('ค่าหาโครง'!B:B, C${r}, 'ค่าหาโครง'!F:F), 0)`,
+          0,
           0, 0, 0,
           `=ROUND(-K${r}*(F${r}/240), 2)`,
           `=ROUND(-(J${r}/60)*(F${r}/240), 2)`,
@@ -282,6 +282,9 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
       calcSheet.getRange(2, 16, lastRow - 1, 1).setValues(diligenceCol);
     }
   }
+
+  // ซิงก์ยอดรวม ค่าวัดหน้างาน (N) และ ค่าหาโครง (O) ของเดือนนี้เข้าชีต Calculation ด้วย
+  syncBonusTotalsToCalculation(yearMonth);
 
   repoAppendAuditLog(actor || 'admin', 'SYNC_PAYROLL', 'Calculation', yearMonth,
     null, { timeClockRows: tcData.length - 1, calcUpdated: calcUpdated, calcAdded: calcAdded }, 'ส่งข้อมูลเวลาเข้า Calculation + Time Clock');
@@ -419,4 +422,327 @@ function updatePayrollCalculationRow(rowIndex, updates, actor) {
   SpreadsheetApp.flush();
   repoAppendAuditLog(actor || 'admin', 'EDIT_PAYROLL_ROW', 'Calculation', 'ROW_' + rowIndex, before, after, 'แก้ไขตัวเลขเงินเดือนจาก Dashboard');
   return { ok: true };
+}
+
+/* ================= Frame Finding (ค่าหาโครง) & Site Measure (ค่าวัดหน้างาน) ================= */
+
+function calcFrameFindingFee(salesAmount) {
+  const s = Number(salesAmount) || 0;
+  if (s >= 200000) return 200;
+  if (s >= 150000) return 150;
+  if (s >= 100000) return 100;
+  if (s >= 50000) return 50;
+  if (s >= 1) return 40;
+  return 0;
+}
+
+function calcSiteMeasureFee(salesAmount) {
+  const s = Number(salesAmount) || 0;
+  if (s >= 1000000) return 500;
+  if (s >= 100000) return 300;
+  if (s >= 20000) return 100;
+  if (s >= 1) return 50;
+  return 0;
+}
+
+function parseParticipantsJson(str) {
+  try {
+    const arr = JSON.parse(String(str || '[]'));
+    return Array.isArray(arr) ? arr : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function getMonthBonusData(yearMonth) {
+  ensureBonusSheets();
+  const ym = String(yearMonth || '').trim();
+  const frameRows = repoReadAll(SHEETS.FRAME_FINDING).rows
+    .filter(r => String(r.year_month || '').trim() === ym)
+    .map(r => ({
+      record_id: String(r.record_id || ''),
+      year_month: ym,
+      employee_id: String(r.employee_id || ''),
+      code: String(r.code || ''),
+      name: String(r.name || ''),
+      nickname: String(r.nickname || ''),
+      bill_no: String(r.bill_no || ''),
+      customer_name: String(r.customer_name || ''),
+      sales_amount: Number(r.sales_amount) || 0,
+      amount: Number(r.amount) || 0,
+      note: String(r.note || ''),
+      created_at: String(r.created_at || '')
+    }));
+
+  const measureRows = repoReadAll(SHEETS.SITE_MEASURE).rows
+    .filter(r => String(r.year_month || '').trim() === ym)
+    .map(r => ({
+      record_id: String(r.record_id || ''),
+      year_month: ym,
+      bill_no: String(r.bill_no || ''),
+      customer_name: String(r.customer_name || ''),
+      sales_amount: Number(r.sales_amount) || 0,
+      total_amount: Number(r.total_amount) || 0,
+      participants: parseParticipantsJson(r.participants_json),
+      participants_summary: String(r.participants_summary || ''),
+      note: String(r.note || ''),
+      created_at: String(r.created_at || '')
+    }));
+
+  const frameByEmp = {};
+  frameRows.forEach(r => {
+    const k = normEmpCode(r.code || r.employee_id);
+    if (!frameByEmp[k]) frameByEmp[k] = { code: r.code, name: r.name, nickname: r.nickname, count: 0, total: 0 };
+    frameByEmp[k].count++;
+    frameByEmp[k].total = round2(frameByEmp[k].total + r.amount);
+  });
+
+  const measureByEmp = {};
+  measureRows.forEach(r => {
+    r.participants.forEach(p => {
+      const k = normEmpCode(p.code || p.employee_id);
+      if (!measureByEmp[k]) measureByEmp[k] = { code: p.code, name: p.name, nickname: p.nickname, count: 0, total: 0 };
+      measureByEmp[k].count++;
+      measureByEmp[k].total = round2(measureByEmp[k].total + (Number(p.amount) || 0));
+    });
+  });
+
+  return {
+    yearMonth: ym,
+    frameFindings: frameRows,
+    siteMeasures: measureRows,
+    frameSummary: Object.values(frameByEmp).sort((a, b) => b.total - a.total),
+    measureSummary: Object.values(measureByEmp).sort((a, b) => b.total - a.total)
+  };
+}
+
+/**
+ * รวมยอด ค่าวัดหน้างาน (คอลัมน์ N) และ ค่าหาโครง (คอลัมน์ O) ของเดือนที่เลือก
+ * แล้วอัปเดตลงชีต Calculation ใน HomesteelKK_Salary โดยจับคู่จากรหัสพนักงาน (code)
+ */
+function syncBonusTotalsToCalculation(yearMonth) {
+  try {
+    ensureBonusSheets();
+    const ym = String(yearMonth || '').trim();
+    if (!/^\d{4}-\d{2}$/.test(ym)) return false;
+    const cfg = getAppConfig();
+    if (!cfg.PAYROLL_SHEET_ID) return false;
+
+    const payrollSs = getPayrollDb();
+    const calcSheet = payrollSs.getSheetByName('Calculation');
+    if (!calcSheet || calcSheet.getLastRow() < 2) return false;
+    if (String(calcSheet.getRange(1, 7).getValue()).indexOf('วันมาทำงาน') === -1) return false;
+
+    const frameTotals = {};
+    repoReadAll(SHEETS.FRAME_FINDING).rows
+      .filter(r => String(r.year_month || '').trim() === ym)
+      .forEach(r => {
+        const k = normEmpCode(r.code || r.employee_id);
+        frameTotals[k] = round2((frameTotals[k] || 0) + (Number(r.amount) || 0));
+      });
+
+    const measureTotals = {};
+    repoReadAll(SHEETS.SITE_MEASURE).rows
+      .filter(r => String(r.year_month || '').trim() === ym)
+      .forEach(r => {
+        parseParticipantsJson(r.participants_json).forEach(p => {
+          const k = normEmpCode(p.code || p.employee_id);
+          measureTotals[k] = round2((measureTotals[k] || 0) + (Number(p.amount) || 0));
+        });
+      });
+
+    const lastRow = calcSheet.getLastRow();
+    const codes = calcSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    const measureCol = [];
+    const frameCol = [];
+    for (let i = 0; i < codes.length; i++) {
+      const k = normEmpCode(codes[i][0]);
+      measureCol.push([measureTotals[k] || 0]);
+      frameCol.push([frameTotals[k] || 0]);
+    }
+    calcSheet.getRange(2, 14, lastRow - 1, 1).setValues(measureCol); // N: ค่าวัดหน้างาน
+    calcSheet.getRange(2, 15, lastRow - 1, 1).setValues(frameCol);   // O: ค่าหาโครง
+    SpreadsheetApp.flush();
+    return true;
+  } catch (e) {
+    Logger.log('syncBonusTotalsToCalculation skip: ' + e.message);
+    return false;
+  }
+}
+
+function addFrameFinding(payload, actor) {
+  ensureBonusSheets();
+  const ym = String(payload.year_month || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(ym)) throw new Error('กรุณาระบุเดือนให้ถูกต้องครับ');
+  const emp = repoFindEmployeeById(payload.employee_id);
+  if (!emp) throw new Error('กรุณาเลือกพนักงานที่หาโครงครับ');
+
+  const sales = Number(payload.sales_amount) || 0;
+  const amount = (payload.amount !== undefined && payload.amount !== '' && payload.amount !== null)
+    ? Number(payload.amount) : calcFrameFindingFee(sales);
+  if (isNaN(amount) || amount < 0) throw new Error('จำนวนเงินค่าหาโครงไม่ถูกต้องครับ');
+  const customer = String(payload.customer_name || '').trim();
+  const billNo = String(payload.bill_no || '').trim();
+  if (!customer && !billNo) throw new Error('กรุณาระบุเลขที่บิลหรือชื่อลูกค้าอย่างน้อย 1 ช่องครับ');
+
+  const rec = {
+    record_id: generateId('FF'),
+    year_month: ym,
+    employee_id: String(emp.employee_id),
+    code: String(emp.code || emp.employee_id),
+    name: String(emp.name || ''),
+    nickname: String(emp.nickname || ''),
+    bill_no: billNo,
+    customer_name: customer,
+    sales_amount: round2(sales),
+    amount: round2(amount),
+    note: String(payload.note || '').trim(),
+    created_by: actor || 'admin',
+    created_at: nowStr()
+  };
+
+  repoAppendRow(SHEETS.FRAME_FINDING, rec);
+  repoAppendAuditLog(actor || 'admin', 'ADD_FRAME_FINDING', SHEETS.FRAME_FINDING, rec.record_id, null, rec, 'เพิ่มรายการค่าหาโครงจาก Dashboard');
+  const synced = syncBonusTotalsToCalculation(ym);
+  return { ok: true, synced: synced, data: getMonthBonusData(ym) };
+}
+
+function updateFrameFinding(recordId, payload, actor) {
+  ensureBonusSheets();
+  const rows = repoReadAll(SHEETS.FRAME_FINDING).rows;
+  const target = rows.find(r => String(r.record_id) === String(recordId));
+  if (!target) throw new Error('ไม่พบรายการค่าหาโครงที่ต้องการแก้ไขครับ');
+
+  const emp = repoFindEmployeeById(payload.employee_id || target.employee_id);
+  if (!emp) throw new Error('ไม่พบข้อมูลพนักงานครับ');
+  const sales = Number(payload.sales_amount) || 0;
+  const amount = (payload.amount !== undefined && payload.amount !== '' && payload.amount !== null)
+    ? Number(payload.amount) : calcFrameFindingFee(sales);
+  if (isNaN(amount) || amount < 0) throw new Error('จำนวนเงินค่าหาโครงไม่ถูกต้องครับ');
+
+  const updates = {
+    employee_id: String(emp.employee_id),
+    code: String(emp.code || emp.employee_id),
+    name: String(emp.name || ''),
+    nickname: String(emp.nickname || ''),
+    bill_no: String(payload.bill_no || '').trim(),
+    customer_name: String(payload.customer_name || '').trim(),
+    sales_amount: round2(sales),
+    amount: round2(amount),
+    note: String(payload.note || '').trim()
+  };
+  repoUpdateRow(SHEETS.FRAME_FINDING, target._rowIndex, updates);
+  repoAppendAuditLog(actor || 'admin', 'UPDATE_FRAME_FINDING', SHEETS.FRAME_FINDING, recordId, target, updates, 'แก้ไขรายการค่าหาโครงจาก Dashboard');
+  const ym = String(target.year_month || '').trim();
+  const synced = syncBonusTotalsToCalculation(ym);
+  return { ok: true, synced: synced, data: getMonthBonusData(ym) };
+}
+
+function deleteFrameFinding(recordId, actor) {
+  ensureBonusSheets();
+  const rows = repoReadAll(SHEETS.FRAME_FINDING).rows;
+  const target = rows.find(r => String(r.record_id) === String(recordId));
+  if (!target) throw new Error('ไม่พบรายการค่าหาโครงที่ต้องการลบครับ');
+
+  const ym = String(target.year_month || '').trim();
+  repoDeleteRow(SHEETS.FRAME_FINDING, target._rowIndex);
+  repoAppendAuditLog(actor || 'admin', 'DELETE_FRAME_FINDING', SHEETS.FRAME_FINDING, recordId, target, null, 'ลบรายการค่าหาโครงจาก Dashboard');
+  const synced = syncBonusTotalsToCalculation(ym);
+  return { ok: true, synced: synced, data: getMonthBonusData(ym) };
+}
+
+function buildSiteMeasureParticipants(rawList) {
+  if (!Array.isArray(rawList) || !rawList.length) {
+    throw new Error('กรุณาเลือกพนักงานที่ไปวัดหน้างานอย่างน้อย 1 คนครับ');
+  }
+  const out = [];
+  rawList.forEach(item => {
+    const emp = repoFindEmployeeById(item.employee_id);
+    if (!emp) throw new Error('ไม่พบข้อมูลพนักงานรหัส ' + item.employee_id);
+    const amt = round2(Number(item.amount) || 0);
+    if (amt < 0) throw new Error('จำนวนเงินส่วนแบ่งต้องไม่ติดลบครับ');
+    out.push({
+      employee_id: String(emp.employee_id),
+      code: String(emp.code || emp.employee_id),
+      name: String(emp.name || ''),
+      nickname: String(emp.nickname || ''),
+      amount: amt
+    });
+  });
+  const summary = out.map(p => `${p.code}-${p.nickname || p.name} (${p.amount})`).join(', ');
+  const total = round2(out.reduce((s, p) => s + p.amount, 0));
+  return { list: out, summary: summary, total: total };
+}
+
+function addSiteMeasure(payload, actor) {
+  ensureBonusSheets();
+  const ym = String(payload.year_month || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(ym)) throw new Error('กรุณาระบุเดือนให้ถูกต้องครับ');
+  const customer = String(payload.customer_name || '').trim();
+  const billNo = String(payload.bill_no || '').trim();
+  if (!customer && !billNo) throw new Error('กรุณาระบุเลขที่บิลหรือชื่อลูกค้าอย่างน้อย 1 ช่องครับ');
+
+  const sales = Number(payload.sales_amount) || 0;
+  const parts = buildSiteMeasureParticipants(payload.participants);
+  const totalAmt = (payload.total_amount !== undefined && payload.total_amount !== '' && payload.total_amount !== null)
+    ? round2(Number(payload.total_amount) || 0) : parts.total;
+
+  const rec = {
+    record_id: generateId('SM'),
+    year_month: ym,
+    bill_no: billNo,
+    customer_name: customer,
+    sales_amount: round2(sales),
+    total_amount: totalAmt,
+    participants_json: JSON.stringify(parts.list),
+    participants_summary: parts.summary,
+    note: String(payload.note || '').trim(),
+    created_by: actor || 'admin',
+    created_at: nowStr()
+  };
+
+  repoAppendRow(SHEETS.SITE_MEASURE, rec);
+  repoAppendAuditLog(actor || 'admin', 'ADD_SITE_MEASURE', SHEETS.SITE_MEASURE, rec.record_id, null, rec, 'เพิ่มรายการค่าวัดหน้างานจาก Dashboard');
+  const synced = syncBonusTotalsToCalculation(ym);
+  return { ok: true, synced: synced, data: getMonthBonusData(ym) };
+}
+
+function updateSiteMeasure(recordId, payload, actor) {
+  ensureBonusSheets();
+  const rows = repoReadAll(SHEETS.SITE_MEASURE).rows;
+  const target = rows.find(r => String(r.record_id) === String(recordId));
+  if (!target) throw new Error('ไม่พบรายการค่าวัดหน้างานที่ต้องการแก้ไขครับ');
+
+  const sales = Number(payload.sales_amount) || 0;
+  const parts = buildSiteMeasureParticipants(payload.participants);
+  const totalAmt = (payload.total_amount !== undefined && payload.total_amount !== '' && payload.total_amount !== null)
+    ? round2(Number(payload.total_amount) || 0) : parts.total;
+
+  const updates = {
+    bill_no: String(payload.bill_no || '').trim(),
+    customer_name: String(payload.customer_name || '').trim(),
+    sales_amount: round2(sales),
+    total_amount: totalAmt,
+    participants_json: JSON.stringify(parts.list),
+    participants_summary: parts.summary,
+    note: String(payload.note || '').trim()
+  };
+  repoUpdateRow(SHEETS.SITE_MEASURE, target._rowIndex, updates);
+  repoAppendAuditLog(actor || 'admin', 'UPDATE_SITE_MEASURE', SHEETS.SITE_MEASURE, recordId, target, updates, 'แก้ไขรายการค่าวัดหน้างานจาก Dashboard');
+  const ym = String(target.year_month || '').trim();
+  const synced = syncBonusTotalsToCalculation(ym);
+  return { ok: true, synced: synced, data: getMonthBonusData(ym) };
+}
+
+function deleteSiteMeasure(recordId, actor) {
+  ensureBonusSheets();
+  const rows = repoReadAll(SHEETS.SITE_MEASURE).rows;
+  const target = rows.find(r => String(r.record_id) === String(recordId));
+  if (!target) throw new Error('ไม่พบรายการค่าวัดหน้างานที่ต้องการลบครับ');
+
+  const ym = String(target.year_month || '').trim();
+  repoDeleteRow(SHEETS.SITE_MEASURE, target._rowIndex);
+  repoAppendAuditLog(actor || 'admin', 'DELETE_SITE_MEASURE', SHEETS.SITE_MEASURE, recordId, target, null, 'ลบรายการค่าวัดหน้างานจาก Dashboard');
+  const synced = syncBonusTotalsToCalculation(ym);
+  return { ok: true, synced: synced, data: getMonthBonusData(ym) };
 }

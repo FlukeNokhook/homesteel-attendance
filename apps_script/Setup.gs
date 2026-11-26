@@ -46,6 +46,14 @@ const DB_SCHEMA = {
   ],
   Holidays: [
     'holiday_date', 'holiday_name'
+  ],
+  Frame_Finding: [
+    'record_id', 'year_month', 'employee_id', 'code', 'name', 'nickname',
+    'bill_no', 'customer_name', 'sales_amount', 'amount', 'note', 'created_by', 'created_at'
+  ],
+  Site_Measure: [
+    'record_id', 'year_month', 'bill_no', 'customer_name', 'sales_amount', 'total_amount',
+    'participants_json', 'participants_summary', 'note', 'created_by', 'created_at'
   ]
 };
 
@@ -142,4 +150,23 @@ function ensureVacationQuotaColumn() {
     repoClearCache();
   }
   cache.put('has_vac_quota_col', '1', 21600);
+}
+
+/**
+ * สร้างแท็บ Frame_Finding และ Site_Measure ใน Factory_Payroll_DB อัตโนมัติหากยังไม่มี
+ */
+function ensureBonusSheets() {
+  const ss = repoGetMainDb();
+  [SHEETS.FRAME_FINDING, SHEETS.SITE_MEASURE].forEach(name => {
+    const headers = DB_SCHEMA[name];
+    let sheet = ss.getSheetByName(name);
+    if (!sheet) sheet = ss.insertSheet(name);
+    if (sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+        .setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
+      sheet.setFrozenRows(1);
+      sheet.getRange(1, 1, sheet.getMaxRows(), headers.length).setNumberFormat('@');
+      sheet.autoResizeColumns(1, headers.length);
+    }
+  });
 }

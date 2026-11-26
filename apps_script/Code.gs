@@ -272,3 +272,40 @@ function adminDeleteHoliday(adminSecret, holidayDate) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => deleteHoliday(holidayDate, 'ADMIN'));
 }
+
+/* ================= Frame Finding & Site Measure Management ================= */
+
+function adminGetMonthBonuses(adminSecret, yearMonth) {
+  verifyAdminSecret(adminSecret);
+  return getMonthBonusData(yearMonth);
+}
+
+function adminAddFrameFinding(adminSecret, payload) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => addFrameFinding(payload, 'ADMIN'));
+}
+
+function adminUpdateFrameFinding(adminSecret, recordId, payload) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => updateFrameFinding(recordId, payload, 'ADMIN'));
+}
+
+function adminDeleteFrameFinding(adminSecret, recordId) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => deleteFrameFinding(recordId, 'ADMIN'));
+}
+
+function adminAddSiteMeasure(adminSecret, payload) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => addSiteMeasure(payload, 'ADMIN'));
+}
+
+function adminUpdateSiteMeasure(adminSecret, recordId, payload) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => updateSiteMeasure(recordId, payload, 'ADMIN'));
+}
+
+function adminDeleteSiteMeasure(adminSecret, recordId) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => deleteSiteMeasure(recordId, 'ADMIN'));
+}
