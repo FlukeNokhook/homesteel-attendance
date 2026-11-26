@@ -141,6 +141,7 @@ function handleLiffAction(action, body) {
 
 function adminGetInitData(adminSecret, yearMonth) {
   verifyAdminSecret(adminSecret);
+  ensureVacationQuotaColumn();
   const ym = yearMonth || Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM');
   const period = withScriptLock(() => repoGetOrCreatePeriod(ym + '-01'));
   return {

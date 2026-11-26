@@ -7,7 +7,7 @@
 const DB_SCHEMA = {
   Employees: [
     'employee_id', 'code', 'name', 'nickname', 'department', 'position',
-    'fingerprint_id', 'line_user_id', 'role', 'supervisor_id', 'status', 'hire_date'
+    'fingerprint_id', 'line_user_id', 'role', 'supervisor_id', 'status', 'hire_date', 'vacation_quota'
   ],
   Attendance_Daily: [
     'work_date', 'employee_id', 'code', 'name', 'first_in', 'last_out',
@@ -117,4 +117,29 @@ function setupDatabase() {
 
   repoClearCache();
   Logger.log('ตั้งค่าฐานข้อมูล Factory_Payroll_DB เสร็จเรียบร้อยแล้ว');
+}
+
+/**
+ * เพิ่มคอลัมน์ vacation_quota ต่อท้ายแท็บ Employees ให้อัตโนมัติ (ถ้ายังไม่มี)
+ */
+function ensureVacationQuotaColumn() {
+  const cache = CacheService.getScriptCache();
+  if (cache.get('has_vac_quota_col') === '1') return;
+  const sheet = repoGetMainDb().getSheetByName(SHEETS.EMPLOYEES);
+  if (!sheet || sheet.getLastRow() < 1) return;
+  const lastCol = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+  if (headers.indexOf('vacation_quota') === -1) {
+    const newCol = lastCol + 1;
+    sheet.getRange(1, newCol).setValue('vacation_quota')
+      .setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      const defaults = [];
+      for (let i = 2; i <= lastRow; i++) defaults.push(['6']);
+      sheet.getRange(2, newCol, defaults.length, 1).setNumberFormat('@').setValues(defaults);
+    }
+    repoClearCache();
+  }
+  cache.put('has_vac_quota_col', '1', 21600);
 }
