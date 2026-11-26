@@ -154,12 +154,17 @@
     .subtab-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); box-shadow: 0 2px 8px rgba(37,99,235,.22); }
     .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
     .emp-sum-chip { background: var(--brand-soft); color: #1e3a8a; padding: 6px 12px; border-radius: 99px; font-size: 12.5px; font-weight: 600; }
-    .part-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-    .part-toggle { border: 1px solid var(--border); background: #fff; color: var(--text); padding: 5px 10px; border-radius: 8px; font-size: 12.5px; cursor: pointer; }
+    .part-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
+    .part-toggle { border: 1px solid var(--border); background: #fff; color: var(--text); padding: 6px 13px; border-radius: 99px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .12s; }
+    .part-toggle:hover { border-color: var(--brand); color: var(--brand); }
     .part-toggle.on { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }
     .part-share-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .part-share-item { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 5px 8px; font-size: 12.5px; }
-    .part-share-item input { width: 78px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; text-align: right; font-weight: 600; }
+    .part-share-item { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 5px 10px; font-size: 13px; }
+    .part-share-item input { width: 76px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; text-align: right; font-weight: 600; }
+    .part-share-rm { border: none; background: none; color: #94a3b8; font-size: 15px; cursor: pointer; padding: 0 2px; line-height: 1; }
+    .part-share-rm:hover { color: var(--red); }
+    .rate-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; font-size: 12px; color: var(--text-2); }
+    .rate-pill { background: #f1f5f9; color: #334155; padding: 2px 8px; border-radius: 6px; font-weight: 500; }
 
     .loading-bar { position: fixed; top: 0; left: 0; height: 3px; width: 100%; z-index: 200; overflow: hidden; }
     .loading-bar::after { content: ''; position: absolute; left: -40%; width: 40%; height: 100%; background: linear-gradient(90deg, transparent, var(--brand-2), transparent); animation: slide 1s infinite; }
@@ -373,15 +378,18 @@
 
         <!-- Sub-tab 2: Frame Finding (ค่าหาโครง) -->
         <div id="psub-frame" class="hidden">
-          <div class="callout info">
-            <span>🏗️</span>
-            <div>เรทอัตโนมัติ: ยอดขาย <b>1+</b> = 40 บ. • <b>50,000+</b> = 50 บ. • <b>100,000+</b> = 100 บ. • <b>150,000+</b> = 150 บ. • <b>200,000+</b> = 200 บ. (แก้ยอดเองได้) — บันทึกแล้วซิงก์เข้าคอลัมน์ <b>ค่าหาโครง (O)</b> ใน Calculation อัตโนมัติครับ</div>
-          </div>
           <div class="card">
             <div class="card-head">
               <div>
-                <h3 class="card-title">🏗️ บันทึกค่าหาโครง</h3>
-                <div class="card-sub">ผูกด้วยรหัสพนักงาน (code) ป้องกันชื่อซ้ำ • แยกเก็บประวัติตามเดือนอัตโนมัติ</div>
+                <h3 class="card-title">🏗️ ค่าหาโครง</h3>
+                <div class="rate-bar">
+                  <span>เกณฑ์ยอดขาย:</span>
+                  <span class="rate-pill">1+ → 40฿</span>
+                  <span class="rate-pill">50k+ → 50฿</span>
+                  <span class="rate-pill">100k+ → 100฿</span>
+                  <span class="rate-pill">150k+ → 150฿</span>
+                  <span class="rate-pill">200k+ → 200฿</span>
+                </div>
               </div>
               <button class="btn btn-ghost btn-sm" onclick="loadBonuses()">🔄 รีเฟรช</button>
             </div>
@@ -404,10 +412,10 @@
               </div>
               <div>
                 <label class="card-sub" style="display:block; margin-bottom:4px;">ค่าหาโครง (บาท) *</label>
-                <input type="number" id="ffAmount" class="input" placeholder="คำนวณอัตโนมัติ" min="0" step="1" />
+                <input type="number" id="ffAmount" class="input" placeholder="อัตโนมัติ" min="0" step="1" />
               </div>
               <div>
-                <button class="btn btn-primary btn-block" onclick="submitFrameFinding()">➕ บันทึกค่าหาโครง</button>
+                <button class="btn btn-primary btn-block" onclick="submitFrameFinding()">➕ บันทึก</button>
               </div>
             </div>
             <div id="frameSummaryChips" class="chip-row"></div>
@@ -417,15 +425,17 @@
 
         <!-- Sub-tab 3: Site Measure (ค่าวัดหน้างาน) -->
         <div id="psub-measure" class="hidden">
-          <div class="callout info">
-            <span>📏</span>
-            <div>เรทอัตโนมัติ: ยอดขาย <b>1+</b> = 50 บ. • <b>20,000+</b> = 100 บ. • <b>100,000+</b> = 300 บ. • <b>1,000,000+</b> = 500 บ. — เลือกผู้ร่วมวัดหลายคนระบบหารเท่ากันให้ทันที (และปรับส่วนแบ่งรายคนเองได้) ซิงก์เข้าคอลัมน์ <b>ค่าวัดหน้างาน (N)</b> อัตโนมัติครับ</div>
-          </div>
           <div class="card">
             <div class="card-head">
               <div>
-                <h3 class="card-title">📏 บันทึกค่าวัดหน้างาน</h3>
-                <div class="card-sub">ผูกด้วยรหัสพนักงาน (code) • รองรับการหารหลายคนในบิลเดียว</div>
+                <h3 class="card-title">📏 ค่าวัดหน้างาน</h3>
+                <div class="rate-bar">
+                  <span>เกณฑ์ยอดขาย:</span>
+                  <span class="rate-pill">1+ → 50฿</span>
+                  <span class="rate-pill">20k+ → 100฿</span>
+                  <span class="rate-pill">100k+ → 300฿</span>
+                  <span class="rate-pill">1M+ → 500฿</span>
+                </div>
               </div>
               <button class="btn btn-ghost btn-sm" onclick="loadBonuses()">🔄 รีเฟรช</button>
             </div>
@@ -445,11 +455,11 @@
                 </div>
                 <div>
                   <label class="card-sub" style="display:block; margin-bottom:4px;">ค่าวัดรวม (บาท) *</label>
-                  <input type="number" id="smTotal" class="input" placeholder="คำนวณอัตโนมัติ" min="0" step="1" oninput="splitMeasureShares()" />
+                  <input type="number" id="smTotal" class="input" placeholder="อัตโนมัติ" min="0" step="1" oninput="splitMeasureShares()" />
                 </div>
               </div>
               <div style="margin-top:12px;">
-                <label class="card-sub" style="display:block;">คลิกเลือกพนักงานที่ไปวัดหน้างาน (เลือกได้หลายคน) *</label>
+                <label class="card-sub" style="display:block;">ผู้ไปวัดหน้างาน (เลือกได้หลายคน • ระบบหารเท่ากันและปรับยอดเองได้) *</label>
                 <div id="smEmpPicker" class="part-grid"></div>
                 <div id="smShareWrap" class="part-share-list"></div>
               </div>
@@ -1711,15 +1721,59 @@
       splitMeasureShares();
     }
 
+    const DEFAULT_MEASURE_NICKNAMES = ['Nop', 'Noom', 'Noon', 'Nu', 'Mark'];
+
+    function getQuickMeasureEmps() {
+      const emps = STATE.employees || [];
+      const byId = {};
+      emps.forEach(e => { byId[String(e.employee_id)] = e; });
+      const chosen = [];
+      const seen = new Set();
+
+      // 1) ดึงจากประวัติที่ไปวัดหน้างานบ่อยสุดก่อน (อัตโนมัติตามการใช้งานจริง)
+      ((BONUS_DATA && BONUS_DATA.frequentMeasureEmpIds) || []).forEach(id => {
+        const e = byId[String(id)];
+        if (e && !seen.has(String(e.employee_id)) && chosen.length < 6) {
+          seen.add(String(e.employee_id));
+          chosen.push(e);
+        }
+      });
+      // 2) เติมรายชื่อทีมประจำ (Nop, Noom, Noon, Nu, Mark) ให้ครบถ้าประวัติยังมีไม่ถึง 5 คน
+      DEFAULT_MEASURE_NICKNAMES.forEach(nick => {
+        const e = emps.find(x => String(x.nickname || '').toLowerCase() === nick.toLowerCase());
+        if (e && !seen.has(String(e.employee_id)) && chosen.length < 6) {
+          seen.add(String(e.employee_id));
+          chosen.push(e);
+        }
+      });
+      return chosen;
+    }
+
     function renderSmEmpPicker() {
       const emps = STATE.employees || [];
+      const quick = getQuickMeasureEmps();
+      const quickIds = new Set(quick.map(e => String(e.employee_id)));
       const selectedIds = new Set(SM_SELECTED.map(p => String(p.employee_id)));
-      $('smEmpPicker').innerHTML = emps.map(e => {
+      const others = emps.filter(e => !quickIds.has(String(e.employee_id)));
+
+      const quickBtns = quick.map(e => {
         const id = String(e.employee_id);
         const on = selectedIds.has(id) ? 'on' : '';
-        return `<button type="button" class="part-toggle ${on}" onclick="toggleSmEmp('${esc(id)}')">${esc(e.code || id)}-${esc(e.nickname || e.name)}</button>`;
+        return `<button type="button" class="part-toggle ${on}" title="${esc(empCodeLabel(e))}" onclick="toggleSmEmp('${esc(id)}')">${on ? '✓ ' : ''}${esc(e.nickname || e.name)}</button>`;
       }).join('');
+
+      const otherSelect = others.length ? `<select class="select" style="width:auto; min-width:165px; padding:5px 10px; font-size:13px;" onchange="if(this.value){addSmEmpFromSelect(this.value); this.value='';}">
+        <option value="">+ เลือกพนักงานคนอื่น...</option>
+        ${others.map(e => `<option value="${esc(e.employee_id)}">${esc(e.nickname || e.name)} (${esc(e.name)})</option>`).join('')}
+      </select>` : '';
+
+      $('smEmpPicker').innerHTML = quickBtns + otherSelect;
       renderSmShares();
+    }
+
+    function addSmEmpFromSelect(empId) {
+      if (SM_SELECTED.some(p => String(p.employee_id) === String(empId))) return;
+      toggleSmEmp(empId);
     }
 
     function toggleSmEmp(empId) {
@@ -1729,7 +1783,7 @@
       } else {
         const e = (STATE.employees || []).find(x => String(x.employee_id) === String(empId));
         if (!e) return;
-        SM_SELECTED.push({ employee_id: String(e.employee_id), label: `${e.code || e.employee_id}-${e.nickname || e.name}`, amount: 0 });
+        SM_SELECTED.push({ employee_id: String(e.employee_id), label: e.nickname || e.name, amount: 0 });
       }
       splitMeasureShares();
       renderSmEmpPicker();
@@ -1749,7 +1803,7 @@
 
     function renderSmShares() {
       if (!SM_SELECTED.length) {
-        $('smShareWrap').innerHTML = '<span class="card-sub">ยังไม่ได้เลือกพนักงานที่ไปวัดหน้างาน</span>';
+        $('smShareWrap').innerHTML = '<span class="card-sub">คลิกชื่อด้านบนเพื่อเลือกผู้ไปวัดหน้างาน</span>';
         return;
       }
       const sum = Math.round(SM_SELECTED.reduce((s, p) => s + (Number(p.amount) || 0), 0) * 100) / 100;
@@ -1758,7 +1812,8 @@
           <span><b>${esc(p.label)}</b></span>
           <input type="number" min="0" step="0.5" value="${p.amount}" oninput="SM_SELECTED[${idx}].amount=Number(this.value)||0; updateSmShareSum()" />
           <span>บ.</span>
-        </div>`).join('') + `<span id="smShareSum" class="card-sub" style="align-self:center; margin-left:4px;">รวมส่วนแบ่ง: <b>${fmtBaht(sum)}</b> บ.</span>`;
+          <button type="button" class="part-share-rm" title="นำออก" onclick="toggleSmEmp('${esc(p.employee_id)}')">×</button>
+        </div>`).join('') + `<span id="smShareSum" class="card-sub" style="align-self:center; margin-left:4px;">รวม: <b>${fmtBaht(sum)}</b> บ.</span>`;
     }
 
     function updateSmShareSum() {
@@ -1771,6 +1826,7 @@
       populateBonusEmpControls();
       try {
         BONUS_DATA = await call('adminGetMonthBonuses', $('monthPicker').value) || BONUS_DATA;
+        renderSmEmpPicker();
         renderBonuses();
       } catch (err) { toast(err.message, 'error'); }
     }
@@ -1928,7 +1984,7 @@
       const r = (BONUS_DATA.siteMeasures || []).find(x => x.record_id === recordId);
       if (!r) return;
       EDIT_SM_PARTS = (r.participants || []).map(p => ({
-        employee_id: String(p.employee_id), label: `${p.code || p.employee_id}-${p.nickname || p.name}`, amount: Number(p.amount) || 0
+        employee_id: String(p.employee_id), label: p.nickname || p.name, amount: Number(p.amount) || 0
       }));
       const root = $('modalRoot');
       root.innerHTML = `<div class="modal-bg"><div class="modal wide">
@@ -1977,16 +2033,29 @@
 
     function renderEditSmPicker() {
       const emps = STATE.employees || [];
+      const quick = getQuickMeasureEmps();
+      const quickIds = new Set(quick.map(e => String(e.employee_id)));
       const ids = new Set(EDIT_SM_PARTS.map(p => String(p.employee_id)));
-      $('esmEmpPicker').innerHTML = emps.map(e => {
+      const others = emps.filter(e => !quickIds.has(String(e.employee_id)));
+
+      const quickBtns = quick.map(e => {
         const id = String(e.employee_id);
-        return `<button type="button" class="part-toggle ${ids.has(id) ? 'on' : ''}" onclick="toggleEditSmEmp('${esc(id)}')">${esc(e.code || id)}-${esc(e.nickname || e.name)}</button>`;
+        const on = ids.has(id) ? 'on' : '';
+        return `<button type="button" class="part-toggle ${on}" title="${esc(empCodeLabel(e))}" onclick="toggleEditSmEmp('${esc(id)}')">${on ? '✓ ' : ''}${esc(e.nickname || e.name)}</button>`;
       }).join('');
+
+      const otherSelect = others.length ? `<select class="select" style="width:auto; min-width:165px; padding:5px 10px; font-size:13px;" onchange="if(this.value){if(!EDIT_SM_PARTS.some(p=>String(p.employee_id)===this.value))toggleEditSmEmp(this.value); this.value='';}">
+        <option value="">+ เลือกพนักงานคนอื่น...</option>
+        ${others.map(e => `<option value="${esc(e.employee_id)}">${esc(e.nickname || e.name)} (${esc(e.name)})</option>`).join('')}
+      </select>` : '';
+
+      $('esmEmpPicker').innerHTML = quickBtns + otherSelect;
       $('esmShareWrap').innerHTML = EDIT_SM_PARTS.map((p, idx) => `
         <div class="part-share-item">
           <span><b>${esc(p.label)}</b></span>
           <input type="number" min="0" step="0.5" value="${p.amount}" oninput="EDIT_SM_PARTS[${idx}].amount=Number(this.value)||0" />
           <span>บ.</span>
+          <button type="button" class="part-share-rm" title="นำออก" onclick="toggleEditSmEmp('${esc(p.employee_id)}')">×</button>
         </div>`).join('');
     }
 
@@ -1995,7 +2064,7 @@
       if (idx >= 0) EDIT_SM_PARTS.splice(idx, 1);
       else {
         const e = (STATE.employees || []).find(x => String(x.employee_id) === String(empId));
-        if (e) EDIT_SM_PARTS.push({ employee_id: String(e.employee_id), label: `${e.code || e.employee_id}-${e.nickname || e.name}`, amount: 0 });
+        if (e) EDIT_SM_PARTS.push({ employee_id: String(e.employee_id), label: e.nickname || e.name, amount: 0 });
       }
       splitEditSmShares();
     }

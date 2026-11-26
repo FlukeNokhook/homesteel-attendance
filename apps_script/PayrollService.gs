@@ -474,7 +474,19 @@ function getMonthBonusData(yearMonth) {
       created_at: String(r.created_at || '')
     }));
 
-  const measureRows = repoReadAll(SHEETS.SITE_MEASURE).rows
+  const allMeasureRows = repoReadAll(SHEETS.SITE_MEASURE).rows;
+  const freqCount = {};
+  allMeasureRows.forEach(r => {
+    parseParticipantsJson(r.participants_json).forEach(p => {
+      const id = String(p.employee_id || '').trim();
+      if (id) freqCount[id] = (freqCount[id] || 0) + 1;
+    });
+  });
+  const frequentMeasureEmpIds = Object.keys(freqCount)
+    .sort((a, b) => freqCount[b] - freqCount[a])
+    .slice(0, 6);
+
+  const measureRows = allMeasureRows
     .filter(r => String(r.year_month || '').trim() === ym)
     .map(r => ({
       record_id: String(r.record_id || ''),
@@ -512,7 +524,8 @@ function getMonthBonusData(yearMonth) {
     frameFindings: frameRows,
     siteMeasures: measureRows,
     frameSummary: Object.values(frameByEmp).sort((a, b) => b.total - a.total),
-    measureSummary: Object.values(measureByEmp).sort((a, b) => b.total - a.total)
+    measureSummary: Object.values(measureByEmp).sort((a, b) => b.total - a.total),
+    frequentMeasureEmpIds: frequentMeasureEmpIds
   };
 }
 
