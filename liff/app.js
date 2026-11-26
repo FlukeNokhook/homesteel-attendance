@@ -577,6 +577,37 @@ function leaveDur(l) { return l.duration_mode === 'HOURS' ? `${l.hours} ชม.`
 
 function renderHistory() {
   const f = radioVal('histFilter');
+  if (f === 'daily') {
+    const daily = ((DATA.attendance && DATA.attendance.daily) || [])
+      .filter(r => String(r.work_date) <= todayIso() || r.first_in || r.last_out);
+    if (!daily.length) {
+      $('historyList').innerHTML = '<div class="empty"><i>🕒</i>ยังไม่มีประวัติเวลาเข้า-ออกงานของเดือนนี้ครับ</div>';
+      return;
+    }
+    const dayStatusTh = {
+      NORMAL: 'ปกติ', OFF: 'วันหยุด', CORRECTED: 'แก้ไขเวลา', RESOLVED: 'ตรวจแล้ว',
+      ABSENT: 'ขาดงาน', EXCEPTION: 'รอตรวจสอบ', UPCOMING: 'ยังไม่ถึงวัน'
+    };
+    const leaves = DATA.leaves || [];
+    const ots = DATA.ots || [];
+    $('historyList').innerHTML = daily.map(r => {
+      const wd = String(r.work_date);
+      const dayLeaves = leaves.filter(l => wd >= String(l.start_date) && wd <= String(l.end_date || l.start_date));
+      const dayOts = ots.filter(o => String(o.ot_date) === wd);
+      const stCls = (r.status === 'ABSENT' || r.flags) ? 'REJECTED' : (r.status === 'OFF' ? 'PENDING' : 'APPROVED');
+      const scanLine = (r.first_in || r.last_out)
+        ? `เข้า <b>${esc(r.first_in || '-')}</b> • ออก <b>${esc(r.last_out || '-')}</b>${Number(r.late_min) > 0 ? ` • <span style="color:#b91c1c;">สาย ${r.late_min} น.</span>` : ''}`
+        : (r.status === 'OFF' ? 'วันหยุด' : 'ไม่พบข้อมูลสแกนนิ้ว');
+      const lvLines = dayLeaves.map(l => `<br>📝 ${esc(l.leave_type)} (${esc(leaveDur(l))}) • ${esc(STATUS_TH[l.status] || l.status)}`).join('');
+      const otLines = dayOts.map(o => `<br>⏰ OT ${esc(o.approved_start || o.requested_start)}–${esc(o.approved_end || o.requested_end)} • ${esc(STATUS_TH[o.status] || o.status)}${Number(r.ot_paid_hours) > 0 ? ` (ได้จริง ${r.ot_paid_hours} ชม.)` : ''}`).join('');
+      return `<div class="item"><div class="item-ico" style="background:var(--brand-soft)">🕒</div><div class="item-body">
+        <div class="item-top"><div class="item-title">${esc(thaiDate(wd))}</div><span class="pill pill-${stCls}">${esc(dayStatusTh[r.status] || r.status)}</span></div>
+        <div class="item-meta">${scanLine}${lvLines}${otLines}</div>
+      </div></div>`;
+    }).join('');
+    return;
+  }
+
   const list = f === 'ot' ? (DATA.ots || []) : (DATA.leaves || []);
   if (!list.length) {
     $('historyList').innerHTML = `<div class="empty"><i>${f === 'ot' ? '⏰' : '📝'}</i>ยังไม่มีประวัติ${f === 'ot' ? 'การขอโอที' : 'การลา'}</div>`;

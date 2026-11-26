@@ -505,6 +505,8 @@ function getMonthOverview(yearMonth) {
   const ots = repoReadAll(SHEETS.OT).rows.filter(o => String(o.ot_date).indexOf(yearMonth) === 0);
   const missed = repoReadAll(SHEETS.MISSED_SCAN).rows.filter(m => String(m.work_date).indexOf(yearMonth) === 0 && String(m.status) === 'OPEN');
 
+  const empNickMap = {};
+  repoGetEmployees().forEach(e => { empNickMap[String(e.employee_id)] = String(e.nickname || ''); });
   const exceptions = [];
 
   // 1. เคสจาก Attendance_Daily (ข้ามแถวที่กด "ตรวจแล้ว" RESOLVED)
@@ -527,6 +529,7 @@ function getMonthOverview(yearMonth) {
         work_date: r.work_date,
         employee_id: r.employee_id,
         name: r.name,
+        nickname: empNickMap[String(r.employee_id)] || '',
         first_in: r.first_in,
         last_out: r.last_out,
         code: code,
@@ -543,6 +546,7 @@ function getMonthOverview(yearMonth) {
       work_date: m.work_date,
       employee_id: m.employee_id,
       name: m.name,
+      nickname: empNickMap[String(m.employee_id)] || '',
       first_in: '',
       last_out: '',
       code: 'MISSED_SCAN_REPORT',
@@ -571,6 +575,7 @@ function getMonthOverview(yearMonth) {
         work_date: l.start_date,
         employee_id: l.employee_id,
         name: l.name,
+        nickname: empNickMap[String(l.employee_id)] || '',
         first_in: '',
         last_out: '',
         code: rawFlags[0],
@@ -587,6 +592,7 @@ function getMonthOverview(yearMonth) {
       work_date: o.ot_date,
       employee_id: o.employee_id,
       name: o.name,
+      nickname: empNickMap[String(o.employee_id)] || '',
       first_in: '',
       last_out: '',
       code: 'PENDING_OT',

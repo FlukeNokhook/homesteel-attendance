@@ -148,7 +148,7 @@ function adminGetInitData(adminSecret, yearMonth) {
     yearMonth: ym,
     period: { year_month: period.year_month, status: period.status, locked_by: period.locked_by, locked_at: period.locked_at },
     employees: repoGetEmployees().filter(isActiveEmp).map(e => ({
-      employee_id: e.employee_id, code: e.code || e.employee_id, name: e.name, department: e.department || ''
+      employee_id: e.employee_id, code: e.code || e.employee_id, name: e.name, nickname: e.nickname || '', department: e.department || ''
     })),
     pendingVacations: listPendingVacationLeaves(),
     unackLeaves: listUnacknowledgedLeaves(),
