@@ -197,6 +197,20 @@ function getLeaveQuotas(employeeId, refDateStr, preloadedRows) {
   };
 }
 
+function getMinAdvanceWorkingDate(baseDateStr, advanceDays) {
+  const holidaySet = repoGetHolidaySet();
+  const d = new Date(baseDateStr + 'T00:00:00+07:00');
+  d.setDate(d.getDate() + advanceDays);
+  let guard = 0;
+  while (guard < 14) {
+    const ds = Utilities.formatDate(d, TIMEZONE, 'yyyy-MM-dd');
+    if (!isOffDay(ds, holidaySet)) return ds;
+    d.setDate(d.getDate() + 1);
+    guard++;
+  }
+  return Utilities.formatDate(d, TIMEZONE, 'yyyy-MM-dd');
+}
+
 function submitLeaveRequest(emp, payload) {
   const startDate = String(payload.start_date || '').trim();
   const durationMode = String(payload.duration_mode || 'FULL_DAY').toUpperCase();
@@ -281,21 +295,16 @@ function submitLeaveRequest(emp, payload) {
     if (durationMode === 'HOURS') {
       throw new Error('ลาพักร้อนไม่สามารถลาแบบรายชั่วโมงได้ครับ กรุณาเลือกเต็มวัน');
     }
-    const vacAdvanceDays = 3;
-    if (diffDays < vacAdvanceDays) {
-      const minD = new Date(today + 'T00:00:00+07:00');
-      minD.setDate(minD.getDate() + vacAdvanceDays);
-      const minStr = Utilities.formatDate(minD, TIMEZONE, 'yyyy-MM-dd');
-      throw new Error('ลาพักร้อนต้องยื่นล่วงหน้าอย่างน้อย ' + vacAdvanceDays + ' วัน (เลือกวันลาได้ตั้งแต่ ' + minStr + ' เป็นต้นไป) ครับ');
+    const minStr = getMinAdvanceWorkingDate(today, 3);
+    if (startDate < minStr) {
+      throw new Error('ลาพักร้อนต้องยื่นล่วงหน้าอย่างน้อย 3 วัน (เลือกวันทำงานได้ตั้งแต่ ' + minStr + ' เป็นต้นไป) ครับ');
     }
     status = 'PENDING';
     noticeType = 'ADVANCE';
   } else if (leaveType === 'ลาอบรม') {
-    if (diffDays < 3) {
-      const minD = new Date(today + 'T00:00:00+07:00');
-      minD.setDate(minD.getDate() + 3);
-      const minStr = Utilities.formatDate(minD, TIMEZONE, 'yyyy-MM-dd');
-      throw new Error('ลาอบรมต้องยื่นล่วงหน้าอย่างน้อย 3 วัน (เลือกได้ตั้งแต่ ' + minStr + ' เป็นต้นไป) ครับ');
+    const minStr = getMinAdvanceWorkingDate(today, 3);
+    if (startDate < minStr) {
+      throw new Error('ลาอบรมต้องยื่นล่วงหน้าอย่างน้อย 3 วัน (เลือกวันทำงานได้ตั้งแต่ ' + minStr + ' เป็นต้นไป) ครับ');
     }
     if (!fileId) {
       throw new Error('การลาอบรมต้องแนบรูปเอกสารทางการประกอบการลาด้วยครับ');

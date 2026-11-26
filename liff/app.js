@@ -247,10 +247,21 @@ function checkClientConsecutive(startDate, endDate, leaveType) {
   return timeline.length >= 3 ? `หยุดต่อเนื่อง ${timeline.length} วัน: ${timeline.join(' → ')}` : '';
 }
 
+function nextWorkingDayIso(isoDate) {
+  const hMap = DATA.holidays || {};
+  let cur = isoDate;
+  for (let i = 0; i < 14; i++) {
+    const isOff = (new Date(cur + 'T00:00:00').getDay() === 0) || !!hMap[cur];
+    if (!isOff) return cur;
+    cur = addDaysIso(cur, 1);
+  }
+  return cur;
+}
+
 function updateLeaveForm() {
   const type = radioVal('leaveType');
   const today = todayIso();
-  const minAdvance3 = addDaysIso(today, 3);
+  const minAdvance3 = nextWorkingDayIso(addDaysIso(today, 3)); // หากตรงวันอาทิตย์หรือวันหยุดนักขัตฤกษ์ ให้ขยับเป็นวันทำงานถัดไป
   const minBack7 = addDaysIso(today, -7);
 
   // ลาพักร้อน: ไม่มีแบบรายชั่วโมง บังคับเต็มวันเท่านั้น
@@ -333,9 +344,15 @@ function updateLeaveForm() {
     const days = Math.round((new Date(e) - new Date(s)) / 86400000) + 1;
     durText = `${days} วัน${days > 1 ? ' (ระบบนับเฉพาะวันทำงาน)' : ''}`;
   }
+  const hMap = DATA.holidays || {};
+  const isSingleOff = s && (!e || e === s) && ((new Date(s + 'T00:00:00').getDay() === 0) || !!hMap[s]);
+  const offWarn = isSingleOff
+    ? `<div style="margin-top:6px; padding:7px 10px; border-radius:8px; background:#fef3c7; color:#92400e; font-size:12.5px; font-weight:600;">⚠️ วันที่ ${esc(thaiDate(s))} เป็น${hMap[s] ? 'วันหยุด: ' + esc(hMap[s]) : 'วันหยุดประจำสัปดาห์ (วันอาทิตย์)'} กรุณาเลือกวันทำงานครับ</div>`
+    : '';
   const consecWarn = s ? checkClientConsecutive(s, e, type) : '';
   $('leaveSummary').innerHTML = s
     ? `<b>${esc(type)}</b> • ${esc(durText)}<br>📅 ${esc(thaiDate(s))}${e && e !== s ? ' – ' + esc(thaiDate(e)) : ''}` +
+      offWarn +
       (consecWarn ? `<div style="margin-top:8px; padding:8px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-size:13px; font-weight:600;">🚨 แจ้งเตือน: ${esc(consecWarn)}</div>` : '')
     : '';
 }
