@@ -180,8 +180,13 @@ function ingestRawScans(rowsInput, source, actor) {
 
 function isEffectiveLeave(l) {
   const st = String(l.status).toUpperCase();
+  const flags = String(l.flags || '');
   if (l.leave_type === 'ลาพักร้อน') return st === 'APPROVED';
   if (st === 'REJECTED' || st === 'ACKNOWLEDGED_UNPAID') return false;
+  // ลากิจที่แจ้งล่วงหน้าน้อยกว่า 8 ชม. -> ถือเป็นวันขาดงาน ไม่นับชั่วโมงทำงาน
+  if (l.leave_type === 'ลากิจ' && flags.indexOf('PERSONAL_UNDER_8H_UNPAID') !== -1) return false;
+  // ลาป่วยไม่มีใบรับรองแพทย์ครั้งที่ 2+ ที่เลยกำหนดวันที่ 30 ของเดือนนั้นแล้ว -> ไม่นับชั่วโมงทำงาน
+  if (st === 'WAITING_MEDICAL_CERT' && todayStr() > getMedCertDeadline(l.start_date)) return false;
   return true;
 }
 
@@ -556,6 +561,7 @@ function getMonthOverview(yearMonth) {
         SICK_LIMIT_EXCEEDED: 'ลาป่วยเกินโควตาปี',
         PERSONAL_LIMIT_EXCEEDED: 'ลากิจเกินโควตาปี',
         LATE_NOTICE: 'แจ้งลาช้ากว่ากำหนด',
+        PERSONAL_UNDER_8H_UNPAID: 'ลากิจล่วงหน้าน้อยกว่า 8 ชม. (ถือเป็นขาดงาน ไม่นับ ชม. ทำงาน)',
         CONSECUTIVE_LEAVE_3PLUS: 'ลาต่อเนื่องตั้งแต่ 3 วันขึ้นไป',
         SAME_DAY_MULTI_LEAVE: 'มีใบลาหลายรายการในวันเดียวกัน'
       };

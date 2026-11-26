@@ -18,17 +18,18 @@ const SHEETS = {
 
 const TIMEZONE = 'Asia/Bangkok';
 
-const LEAVE_TYPES = ['ลาป่วย', 'ลากิจ', 'ลาพักร้อน', 'ลาอื่นๆ'];
+const LEAVE_TYPES = ['ลาป่วย', 'ลากิจ', 'ลาพักร้อน', 'ลาอบรม'];
 
 const DEFAULT_SETTINGS = {
   WORK_START_TIME: '08:00',
   WORK_END_TIME: '17:00',
   LUNCH_MINUTES: '60',
   WORK_HOURS_PER_DAY: '8',
-  GRACE_LATE_MINUTES: '0',
+  GRACE_LATE_MINUTES: '5',
   SHORT_WORK_THRESHOLD_HOURS: '4',
   PERSONAL_LEAVE_LIMIT_DAYS: '3',
-  PERSONAL_ADVANCE_DAYS: '1',
+  PERSONAL_ADVANCE_HOURS: '8',
+  VACATION_LEAVE_LIMIT_DAYS: '6',
   SICK_LEAVE_LIMIT_DAYS: '30',
   SICK_NO_CERT_MONTHLY_DAYS: '1',
   COUNT_WORKING_DAYS_ONLY: 'TRUE'

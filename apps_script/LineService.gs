@@ -58,6 +58,12 @@ function notifyApproverNewLeave(rec, extra) {
   }
 
   const consecLine = info.consecutiveAlert ? '🚨 ' + info.consecutiveAlert : '';
+  const vacLine = (rec.leave_type === 'ลาพักร้อน' && info.quotas)
+    ? '🌴 สิทธิ์ลาพักร้อนคงเหลือของ ' + rec.name + ': ' + info.quotas.vacationRemaining + '/' + info.quotas.vacationLimit + ' วัน'
+    : '';
+  const personalWarnLine = (rec.leave_type === 'ลากิจ' && String(rec.flags || '').indexOf('PERSONAL_UNDER_8H_UNPAID') !== -1)
+    ? '⚠️ แจ้งลากิจล่วงหน้าน้อยกว่า 8 ชม. — ถือเป็นวันขาดงาน ไม่นับชั่วโมงทำงาน และมีผลต่อการคิดเงินเดือน'
+    : '';
 
   const msg = [
     header,
@@ -66,6 +72,8 @@ function notifyApproverNewLeave(rec, extra) {
     '📌 ' + rec.leave_type + ' • ' + formatLeaveDur(rec),
     '📅 ' + dateText,
     '💬 ' + (rec.reason || '-'),
+    vacLine,
+    personalWarnLine,
     sickLine,
     sickSummaryLine,
     consecLine,

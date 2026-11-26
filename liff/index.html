@@ -45,7 +45,7 @@
             <label class="choice"><input type="radio" name="leaveType" value="ลาป่วย" checked><span><i>🤒</i>ลาป่วย</span></label>
             <label class="choice"><input type="radio" name="leaveType" value="ลากิจ"><span><i>💼</i>ลากิจ</span></label>
             <label class="choice"><input type="radio" name="leaveType" value="ลาพักร้อน"><span><i>🌴</i>พักร้อน</span></label>
-            <label class="choice"><input type="radio" name="leaveType" value="ลาอื่นๆ"><span><i>📄</i>อื่นๆ</span></label>
+            <label class="choice"><input type="radio" name="leaveType" value="ลาอบรม"><span><i>🎓</i>ลาอบรม</span></label>
           </div>
 
           <div id="quotaBanner" class="summary" style="background:#eff6ff; color:#1e3a8a;"></div>
@@ -59,10 +59,12 @@
             </div>
           </div>
 
-          <label class="label">ลานานแค่ไหน</label>
-          <div class="segmented">
-            <label><input type="radio" name="durationMode" value="FULL_DAY" checked><span>เต็มวัน</span></label>
-            <label><input type="radio" name="durationMode" value="HOURS"><span>รายชั่วโมง</span></label>
+          <div id="durationWrap">
+            <label class="label">ลานานแค่ไหน</label>
+            <div class="segmented">
+              <label><input type="radio" name="durationMode" value="FULL_DAY" checked><span>เต็มวัน</span></label>
+              <label><input type="radio" name="durationMode" value="HOURS"><span>รายชั่วโมง</span></label>
+            </div>
           </div>
 
           <div class="row-2">
@@ -97,7 +99,7 @@
           </div>
 
           <div class="field">
-            <label class="label">แนบรูปใบรับรองแพทย์ / เอกสาร <span class="opt">(ถ้ามี)</span></label>
+            <label id="uploadLabel" class="label">แนบรูปใบรับรองแพทย์ / เอกสาร <span class="opt">(ถ้ามี)</span></label>
             <label id="uploadBox" class="upload">
               <input type="file" id="leaveFile" accept="image/*" />
               <div id="uploadEmpty"><i>📷</i><div>แตะเพื่อถ่ายรูปหรือเลือกรูป</div></div>
@@ -207,7 +209,7 @@
   <nav id="bottomNav" class="bottom-nav hidden">
     <button class="active" data-tab="leave"><i>📝</i><span>ขอลา</span></button>
     <button data-tab="ot"><i>⏰</i><span>ขอโอที</span></button>
-    <button data-tab="attendance"><i>🕒</i><span>เวลา/ลืมสแกน</span></button>
+    <button class="hidden" data-tab="attendance"><i>🕒</i><span>เวลา/ลืมสแกน</span></button>
     <button data-tab="history"><i>📋</i><span>ประวัติ</span></button>
     <button id="approveNavBtn" class="hidden" data-tab="approve"><i>✅</i><span>อนุมัติ</span><b id="approveBadge" class="nav-badge hidden">0</b></button>
   </nav>

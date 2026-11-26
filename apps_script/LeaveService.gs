@@ -112,14 +112,28 @@ function checkConsecutiveLeaves(employeeId, startDate, endDate, allLeaves, curre
 }
 
 /**
- * คำนวณสิทธิ์วันลาและประวัติการป่วยของเดือนนี้ (แสดงทั้งฝั่งพนักงานและฝั่งผู้อนุมัติ)
+ * คืนวันที่เส้นตายส่งใบรับรองแพทย์ของเดือนนั้น (วันที่ 30 หรือวันสุดท้ายของเดือน ก.พ.)
+ */
+function getMedCertDeadline(dateStr) {
+  const ym = String(dateStr || '').slice(0, 7);
+  const p = ym.split('-');
+  const lastDay = new Date(parseInt(p[0], 10), parseInt(p[1], 10), 0).getDate();
+  return ym + '-' + String(Math.min(30, lastDay)).padStart(2, '0');
+}
+
+/**
+ * คำนวณสิทธิ์วันลาและประวัติการป่วยของเดือนนี้ + สิทธิ์ลาพักร้อนรายบุคคล
  */
 function getLeaveQuotas(employeeId, refDateStr, preloadedRows) {
   const ref = refDateStr || todayStr();
   const year = ref.slice(0, 4);
   const ym = ref.slice(0, 7);
 
+  const emp = repoFindEmployeeById(employeeId);
   const personalLimit = repoGetSettingNum('PERSONAL_LEAVE_LIMIT_DAYS', 3);
+  const defaultVacLimit = repoGetSettingNum('VACATION_LEAVE_LIMIT_DAYS', 6);
+  const empVac = emp && emp.vacation_quota !== undefined && emp.vacation_quota !== '' ? Number(emp.vacation_quota) : NaN;
+  const vacationLimit = !isNaN(empVac) ? empVac : defaultVacLimit;
   const sickLimit = repoGetSettingNum('SICK_LEAVE_LIMIT_DAYS', 30);
   const sickNoCertMonthlyLimit = repoGetSettingNum('SICK_NO_CERT_MONTHLY_DAYS', 1);
 
@@ -130,6 +144,8 @@ function getLeaveQuotas(employeeId, refDateStr, preloadedRows) {
   );
 
   let personalUsedYear = 0;
+  let vacationUsedYear = 0;
+  let vacationPendingYear = 0;
   let sickUsedYear = 0;
   let sickNoCertUsedMonth = 0;
   let sickCountMonth = 0;
@@ -139,8 +155,13 @@ function getLeaveQuotas(employeeId, refDateStr, preloadedRows) {
   activeLeaves.forEach(l => {
     const sd = String(l.start_date || '');
     const d = Number(l.days || 0);
+    const st = String(l.status).toUpperCase();
     if (sd.indexOf(year) === 0) {
       if (l.leave_type === 'ลากิจ') personalUsedYear += d;
+      if (l.leave_type === 'ลาพักร้อน') {
+        if (st === 'APPROVED') vacationUsedYear += d;
+        else if (st === 'PENDING') vacationPendingYear += d;
+      }
       if (l.leave_type === 'ลาป่วย') sickUsedYear += d;
     }
     if (sd.indexOf(ym) === 0 && l.leave_type === 'ลาป่วย') {
@@ -160,6 +181,10 @@ function getLeaveQuotas(employeeId, refDateStr, preloadedRows) {
     personalLimit: personalLimit,
     personalUsedYear: round2(personalUsedYear),
     personalRemaining: round2(Math.max(0, personalLimit - personalUsedYear)),
+    vacationLimit: vacationLimit,
+    vacationUsedYear: round2(vacationUsedYear),
+    vacationPendingYear: round2(vacationPendingYear),
+    vacationRemaining: round2(Math.max(0, vacationLimit - vacationUsedYear)),
     sickLimit: sickLimit,
     sickUsedYear: round2(sickUsedYear),
     sickRemainingYear: round2(Math.max(0, sickLimit - sickUsedYear)),
@@ -253,6 +278,9 @@ function submitLeaveRequest(emp, payload) {
   let sickNoCertSeq = 0;
 
   if (leaveType === 'ลาพักร้อน') {
+    if (durationMode === 'HOURS') {
+      throw new Error('ลาพักร้อนไม่สามารถลาแบบรายชั่วโมงได้ครับ กรุณาเลือกเต็มวัน');
+    }
     const vacAdvanceDays = 3;
     if (diffDays < vacAdvanceDays) {
       const minD = new Date(today + 'T00:00:00+07:00');
@@ -262,21 +290,32 @@ function submitLeaveRequest(emp, payload) {
     }
     status = 'PENDING';
     noticeType = 'ADVANCE';
+  } else if (leaveType === 'ลาอบรม') {
+    if (diffDays < 3) {
+      const minD = new Date(today + 'T00:00:00+07:00');
+      minD.setDate(minD.getDate() + 3);
+      const minStr = Utilities.formatDate(minD, TIMEZONE, 'yyyy-MM-dd');
+      throw new Error('ลาอบรมต้องยื่นล่วงหน้าอย่างน้อย 3 วัน (เลือกได้ตั้งแต่ ' + minStr + ' เป็นต้นไป) ครับ');
+    }
+    if (!fileId) {
+      throw new Error('การลาอบรมต้องแนบรูปเอกสารทางการประกอบการลาด้วยครับ');
+    }
+    status = 'RECORDED';
+    noticeType = 'ADVANCE';
   } else if (leaveType === 'ลากิจ') {
     status = 'RECORDED';
     const settings = repoGetSettings();
     const workStart = settings.WORK_START_TIME || '08:00';
     const shiftStartMs = new Date(startDate + 'T' + workStart + ':00+07:00').getTime();
     const hoursAhead = (shiftStartMs - Date.now()) / 3600000;
-    if (hoursAhead >= 24) {
+    const minAdvHrs = repoGetSettingNum('PERSONAL_ADVANCE_HOURS', 8);
+    if (hoursAhead >= minAdvHrs) {
       noticeType = 'ADVANCE';
-    } else if (hoursAhead >= 0) {
-      noticeType = 'URGENT';
-      if (!urgentReason) urgentReason = 'เหตุกะทันหัน (แจ้งล่วงหน้าน้อยกว่า 24 ชม.)';
-      flags.push('LATE_NOTICE');
     } else {
-      noticeType = 'LATE';
+      noticeType = hoursAhead >= 0 ? 'URGENT' : 'LATE';
+      if (!urgentReason) urgentReason = 'แจ้งล่วงหน้าน้อยกว่า ' + minAdvHrs + ' ชม.';
       flags.push('LATE_NOTICE');
+      flags.push('PERSONAL_UNDER_8H_UNPAID');
     }
     if (quotas.personalUsedYear + days > quotas.personalLimit) {
       flags.push('PERSONAL_LIMIT_EXCEEDED');
@@ -285,9 +324,15 @@ function submitLeaveRequest(emp, payload) {
     subType = fileId ? 'SICK_WITH_CERT' : 'SICK_NO_CERT';
     const sickReasonType = String(payload.sick_reason_type || 'SUDDEN').toUpperCase();
     if (sickReasonType === 'APPOINTMENT') {
-      noticeType = diffDays > 0 ? 'APPOINTMENT_ADVANCE' : 'APPOINTMENT_LATE';
-      if (diffDays <= 0) flags.push('LATE_NOTICE');
+      if (diffDays < 0) {
+        throw new Error('ลาป่วยกรณีนัดแพทย์ไม่สามารถเลือกวันย้อนหลังได้ครับ');
+      }
+      noticeType = diffDays > 0 ? 'APPOINTMENT_ADVANCE' : 'APPOINTMENT_SAME_DAY';
+      if (diffDays === 0) flags.push('LATE_NOTICE');
     } else {
+      if (diffDays < -7) {
+        throw new Error('สามารถลาป่วยย้อนหลังได้ไม่เกิน 7 วันครับ');
+      }
       noticeType = diffDays >= 0 ? 'SUDDEN' : 'LATE';
       if (diffDays < 0) flags.push('LATE_NOTICE');
     }
@@ -360,6 +405,12 @@ function uploadMedicalCertForLeave(emp, requestId, base64Data, mimeType) {
   if (!target) throw new Error('ไม่พบใบลาที่ระบุครับ');
   if (target.leave_type !== 'ลาป่วย') throw new Error('สามารถแนบใบรับรองแพทย์ได้เฉพาะใบลาป่วยครับ');
 
+  // ตรวจสอบเส้นตายวันที่ 30 ของเดือนนั้น
+  const deadline = getMedCertDeadline(target.start_date);
+  if (todayStr() > deadline) {
+    throw new Error('เลยกำหนดส่งใบรับรองแพทย์แล้ว (ต้องส่งภายในวันที่ ' + deadline + ') ระบบจึงไม่สามารถอัปเดตและไม่นับชั่วโมงทำงานของวันดังกล่าวได้ครับ');
+  }
+
   repoAssertPeriodEditable(target.start_date);
   if (!base64Data) throw new Error('กรุณาเลือกรูปใบรับรองแพทย์ก่อนส่งครับ');
 
@@ -420,9 +471,19 @@ function enrichLeaveForApprover(rec, allRows) {
   const consec = checkConsecutiveLeaves(rec.employee_id, rec.start_date, rec.end_date, allRows, null);
   out.consecutive_alert = consec.summaryText;
 
+  const quotas = getLeaveQuotas(rec.employee_id, rec.start_date, allRows);
+  if (rec.leave_type === 'ลาพักร้อน') {
+    out.vacation_info = {
+      usedDays: quotas.vacationUsedYear,
+      remainingDays: quotas.vacationRemaining,
+      limitDays: quotas.vacationLimit
+    };
+  }
+  if (rec.leave_type === 'ลากิจ' && String(rec.flags || '').indexOf('PERSONAL_UNDER_8H_UNPAID') !== -1) {
+    out.personal_warning = 'แจ้งลากิจล่วงหน้าน้อยกว่า 8 ชม. — ถือเป็นวันขาดงาน ไม่นับชั่วโมงทำงาน และมีผลต่อการคิดเงินเดือน';
+  }
   if (rec.leave_type === 'ลาป่วย') {
     const ym = String(rec.start_date || '').slice(0, 7);
-    const quotas = getLeaveQuotas(rec.employee_id, rec.start_date, allRows);
     // หาลำดับครั้งที่เท่าไหร่ของเดือน (สำหรับลาป่วยไม่มีใบรับรองแพทย์ เรียงตามเวลาที่ยื่น)
     let noCertSeq = 0;
     if (String(rec.sub_type) === 'SICK_NO_CERT') {

@@ -249,14 +249,31 @@ function checkClientConsecutive(startDate, endDate, leaveType) {
 
 function updateLeaveForm() {
   const type = radioVal('leaveType');
-  const mode = radioVal('durationMode');
   const today = todayIso();
-  const minVacDate = addDaysIso(today, 3); // ล่วงหน้า 3 วัน (เช่น วันนี้ 23 -> เลือกได้ตั้งแต่ 26)
+  const minAdvance3 = addDaysIso(today, 3);
+  const minBack7 = addDaysIso(today, -7);
 
+  // ลาพักร้อน: ไม่มีแบบรายชั่วโมง บังคับเต็มวันเท่านั้น
   if (type === 'ลาพักร้อน') {
-    $('leaveStart').min = minVacDate;
-    $('leaveEnd').min = minVacDate;
-    if (!$('leaveStart').value || $('leaveStart').value < minVacDate) $('leaveStart').value = minVacDate;
+    document.querySelector('input[name="durationMode"][value="FULL_DAY"]').checked = true;
+    $('durationWrap').classList.add('hidden');
+  } else {
+    $('durationWrap').classList.remove('hidden');
+  }
+  const mode = radioVal('durationMode');
+
+  // ตั้งค่าช่วงวันที่ที่เลือกได้ตามประเภทการลา
+  let minDate = '';
+  if (type === 'ลาพักร้อน' || type === 'ลาอบรม') {
+    minDate = minAdvance3;
+  } else if (type === 'ลาป่วย') {
+    minDate = radioVal('sickReasonType') === 'APPOINTMENT' ? today : minBack7;
+  }
+
+  if (minDate) {
+    $('leaveStart').min = minDate;
+    $('leaveEnd').min = minDate;
+    if (!$('leaveStart').value || $('leaveStart').value < minDate) $('leaveStart').value = minDate;
     if (!$('leaveEnd').value || $('leaveEnd').value < $('leaveStart').value) $('leaveEnd').value = $('leaveStart').value;
   } else {
     $('leaveStart').removeAttribute('min');
@@ -267,38 +284,45 @@ function updateLeaveForm() {
   const e = mode === 'FULL_DAY' ? $('leaveEnd').value : s;
   const q = DATA.quotas || {};
 
-  // ตรวจเงื่อนไขลากิจล่วงหน้า 24 ชม. (เทียบกับเวลา 08:00 น. ของวันลา)
-  const isPersonalUnder24h = type === 'ลากิจ' && s && ((new Date(s + 'T08:00:00+07:00').getTime() - Date.now()) < 24 * 3600 * 1000);
+  // ลากิจต้องแจ้งล่วงหน้าอย่างน้อย 8 ชม. (เทียบกับเวลา 08:00 น. ของวันลา)
+  const isPersonalUnder8h = type === 'ลากิจ' && s && ((new Date(s + 'T08:00:00+07:00').getTime() - Date.now()) < 8 * 3600 * 1000);
 
   $('leaveEndWrap').classList.toggle('hidden', mode !== 'FULL_DAY');
   $('leaveHoursWrap').classList.toggle('hidden', mode !== 'HOURS');
   $('leaveStartLabel').textContent = mode === 'FULL_DAY' ? 'ตั้งแต่วันที่' : 'วันที่ลา';
   $('sickReasonWrap').classList.toggle('hidden', type !== 'ลาป่วย');
-  $('urgentWrap').classList.toggle('hidden', !isPersonalUnder24h);
+  $('urgentWrap').classList.toggle('hidden', !isPersonalUnder8h);
+  $('uploadLabel').innerHTML = type === 'ลาอบรม'
+    ? 'แนบรูปเอกสารทางการประกอบการลาอบรม <span style="color:#b91c1c;">(บังคับแนบ *)</span>'
+    : 'แนบรูปใบรับรองแพทย์ / เอกสาร <span class="opt">(ถ้ามี)</span>';
 
-  // แสดงสิทธิ์วันลาและเงื่อนไขล่วงหน้าอย่างชัดเจน
   const banner = $('quotaBanner');
   if (type === 'ลาป่วย') {
     const noCertCount = q.sickNoCertCountMonth || 0;
     const withCertCount = q.sickWithCertCountMonth || 0;
     const totalMonthCount = q.sickCountMonth || 0;
     const noCertLeft = q.sickNoCertRemainingMonth !== undefined ? q.sickNoCertRemainingMonth : 1;
+    const isAppt = radioVal('sickReasonType') === 'APPOINTMENT';
     const monthStatus = totalMonthCount > 0
       ? `📊 เดือนนี้คุณลาป่วยไปแล้ว <b>${totalMonthCount} ครั้ง</b> (มีใบรับรองแพทย์ ${withCertCount} ครั้ง / ไม่มีใบรับรองแพทย์ ${noCertCount} ครั้ง)`
       : `📊 เดือนนี้คุณยังไม่เคยลาป่วยครับ`;
+    const dateNote = isAppt ? '📅 นัดแพทย์ไม่สามารถเลือกวันย้อนหลังได้' : '📅 ป่วยกะทันหันเลือกย้อนหลังได้ไม่เกิน 7 วัน';
     const warn = (noCertCount >= 1 || noCertLeft <= 0)
-      ? `<div style="margin-top:6px; padding:8px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-weight:600;">⚠️ เดือนนี้ใช้สิทธิ์ลาป่วยแบบไม่มีใบรับรองแพทย์ครบแล้ว (1 ครั้ง/เดือน) กรุณาแนบใบรับรองแพทย์ครับ</div>`
+      ? `<div style="margin-top:6px; padding:8px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-weight:600;">⚠️ เดือนนี้ใช้สิทธิ์ไม่มีใบรับรองแพทย์ครบแล้ว กรุณาแนบใบรับรองแพทย์ภายในวันที่ 30 ของเดือน (หากไม่ส่งจะไม่นับชั่วโมงทำงาน)</div>`
       : `<div style="margin-top:4px; color:#15803d;">✅ เดือนนี้ยังมีสิทธิ์ลาป่วยไม่มีใบรับรองแพทย์เหลือ <b>1 ครั้ง</b></div>`;
-    banner.innerHTML = `${monthStatus}<br>สิทธิ์ลาป่วยปีนี้คงเหลือ: <b>${q.sickRemainingYear ?? 30}</b> / ${q.sickLimit ?? 30} วัน${warn}`;
+    banner.innerHTML = `${monthStatus}<br>สิทธิ์ลาป่วยปีนี้คงเหลือ: <b>${q.sickRemainingYear ?? 30}</b> / ${q.sickLimit ?? 30} วัน<br><span class="hint">${dateNote}</span>${warn}`;
     banner.classList.remove('hidden');
   } else if (type === 'ลากิจ') {
-    const warn24h = isPersonalUnder24h
-      ? `<div style="margin-top:6px; padding:7px 10px; border-radius:8px; background:#fef3c7; color:#92400e; font-weight:600;">⚠️ ลากิจต้องแจ้งล่วงหน้าอย่างน้อย 24 ชม. (กรณีกะทันหันกรุณาระบุเหตุผลด้านล่าง)</div>`
-      : `<div class="hint" style="margin-top:4px;">⏰ ลากิจต้องแจ้งล่วงหน้าอย่างน้อย 24 ชม. • บันทึกทันทีและแจ้งหัวหน้ารับทราบ</div>`;
-    banner.innerHTML = `สิทธิ์ลากิจปีนี้คงเหลือ: <b>${q.personalRemaining ?? 3}</b> / ${q.personalLimit ?? 3} วัน${warn24h}`;
+    const warn8h = isPersonalUnder8h
+      ? `<div style="margin-top:6px; padding:7px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-weight:600;">⚠️ แจ้งล่วงหน้าน้อยกว่า 8 ชม. — ยังกดส่งได้ แต่วันดังกล่าวจะถือเป็นวันขาดงาน ไม่นับชั่วโมงทำงาน และมีผลต่อการคิดเงินเดือนครับ</div>`
+      : `<div class="hint" style="margin-top:4px;">⏰ ลากิจต้องแจ้งล่วงหน้าอย่างน้อย 8 ชั่วโมง • บันทึกทันทีและแจ้งหัวหน้ารับทราบ</div>`;
+    banner.innerHTML = `สิทธิ์ลากิจปีนี้คงเหลือ: <b>${q.personalRemaining ?? 3}</b> / ${q.personalLimit ?? 3} วัน${warn8h}`;
     banner.classList.remove('hidden');
   } else if (type === 'ลาพักร้อน') {
-    banner.innerHTML = `🌴 ลาพักร้อนต้องยื่นล่วงหน้าอย่างน้อย <b>3 วัน</b> (เลือกได้ตั้งแต่ <b>${esc(thaiDate(minVacDate))}</b> เป็นต้นไป) และรอหัวหน้างานอนุมัติครับ`;
+    banner.innerHTML = `🌴 สิทธิ์ลาพักร้อนของคุณปีนี้คงเหลือ: <b>${q.vacationRemaining ?? 6}</b> / ${q.vacationLimit ?? 6} วัน<br><span class="hint">ลาพักร้อนต้องยื่นล่วงหน้าอย่างน้อย 3 วัน (ตั้งแต่ ${esc(thaiDate(minAdvance3))}) แบบเต็มวันเท่านั้น และรอหัวหน้าอนุมัติ</span>`;
+    banner.classList.remove('hidden');
+  } else if (type === 'ลาอบรม') {
+    banner.innerHTML = `🎓 <b>ลาอบรม</b> ต้องยื่นล่วงหน้าอย่างน้อย <b>3 วัน</b> (ตั้งแต่ <b>${esc(thaiDate(minAdvance3))}</b>) และ<b>ต้องแนบรูปเอกสารทางการประกอบการลาเท่านั้น</b>`;
     banner.classList.remove('hidden');
   } else {
     banner.classList.add('hidden');
@@ -368,10 +392,15 @@ function compressImage(file) {
 
 async function submitLeave(e) {
   e.preventDefault();
-  const mode = radioVal('durationMode');
+  const type = radioVal('leaveType');
+  const mode = type === 'ลาพักร้อน' ? 'FULL_DAY' : radioVal('durationMode');
   const start = $('leaveStart').value;
   const end = mode === 'FULL_DAY' ? $('leaveEnd').value : start;
   if (end < start) { toast('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มลานะครับ', true); return; }
+  if (type === 'ลาอบรม' && !ATTACHMENT) {
+    toast('การลาอบรมต้องแนบรูปเอกสารทางการประกอบการลาด้วยครับ', true);
+    return;
+  }
 
   const consecWarn = checkClientConsecutive(start, end, radioVal('leaveType'));
   if (consecWarn) {
@@ -544,9 +573,16 @@ function renderHistory() {
       </div></div>`;
     }
     const dText = x.start_date === x.end_date ? thaiDate(x.start_date) : `${thaiDate(x.start_date)} – ${thaiDate(x.end_date)}`;
-    const needCertBtn = x.status === 'WAITING_MEDICAL_CERT'
-      ? `<div class="item-actions"><button class="btn btn-primary btn-sm" onclick="triggerUploadLaterCert('${esc(x.request_id)}')">📎 แนบใบรับรองแพทย์</button></div>`
-      : '';
+    let needCertBtn = '';
+    if (x.status === 'WAITING_MEDICAL_CERT') {
+      const ym = String(x.start_date || '').slice(0, 7);
+      const [yy, mm] = ym.split('-').map(Number);
+      const lastD = new Date(yy, mm, 0).getDate();
+      const deadline = `${ym}-${String(Math.min(30, lastD)).padStart(2, '0')}`;
+      needCertBtn = todayIso() > deadline
+        ? `<div style="margin-top:6px; font-size:12px; color:#991b1b; font-weight:600;">❌ เลยกำหนดส่งใบรับรองแพทย์ (วันที่ 30) แล้ว — ไม่นับชั่วโมงทำงาน</div>`
+        : `<div class="item-actions"><button class="btn btn-primary btn-sm" onclick="triggerUploadLaterCert('${esc(x.request_id)}')">📎 แนบใบรับรองแพทย์ (ภายใน ${esc(thaiDate(deadline))})</button></div>`;
+    }
     return `<div class="item"><div class="item-ico" style="background:var(--brand-soft)">📝</div><div class="item-body">
       <div class="item-top"><div class="item-title">${esc(x.leave_type)} ${esc(leaveDur(x))}</div><span class="pill pill-${statusClass(x.status)}">${esc(STATUS_TH[x.status] || x.status)}</span></div>
       <div class="item-meta">📅 ${esc(dText)}<br>💬 ${esc(x.reason || '-')}${x.attachment_file_id ? '<br>📎 แนบเอกสารแล้ว' : ''}${x.reject_reason ? `<br>❗ ${esc(x.reject_reason)}` : ''}</div>
@@ -573,9 +609,13 @@ function renderApprovals() {
   if (vacs.length) {
     html += `<div class="group-label">🌴 ลาพักร้อนรออนุมัติ (${vacs.length})</div>` + vacs.map(l => {
       const dText = l.end_date && l.end_date !== l.start_date ? `${thaiDate(l.start_date)} – ${thaiDate(l.end_date)}` : thaiDate(l.start_date);
+      const vacBox = l.vacation_info
+        ? `<div style="margin-top:6px; padding:6px 10px; border-radius:8px; background:#dcfce7; color:#15803d; font-size:12.5px;">🌴 สิทธิ์ลาพักร้อนคงเหลือของ ${esc(l.name)}: <b>${l.vacation_info.remainingDays}/${l.vacation_info.limitDays} วัน</b></div>`
+        : '';
       return `<div class="item"><div class="item-ico" style="background:var(--brand-soft)">🌴</div><div class="item-body">
         <div class="item-title">${esc(l.name)} • ลาพักร้อน ${esc(leaveDur(l))}</div>
         <div class="item-meta">📅 ${esc(dText)}<br>💬 ${esc(l.reason || '-')}</div>
+        ${vacBox}
         ${l.consecutive_alert ? `<div style="margin-top:6px; padding:7px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-size:12.5px; font-weight:600;">🚨 ${esc(l.consecutive_alert)}</div>` : ''}
         <div class="item-actions">
           <button class="btn btn-reject btn-sm" onclick="decideItem('LEAVE','${esc(l.request_id)}',false)">ไม่อนุมัติ</button>
@@ -617,6 +657,9 @@ function renderApprovals() {
           <div>สิทธิ์ปีนี้คงเหลือ <b>${si.yearRemainingDays}/${si.yearLimit} วัน</b></div>
         </div>`;
       }
+      const personalWarnBox = l.personal_warning
+        ? `<div style="margin-top:6px; padding:7px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-size:12.5px; font-weight:600;">⚠️ ${esc(l.personal_warning)}</div>`
+        : '';
       const consecBox = l.consecutive_alert
         ? `<div style="margin-top:6px; padding:7px 10px; border-radius:8px; background:#fee2e2; color:#991b1b; font-size:12.5px; font-weight:600;">🚨 ${esc(l.consecutive_alert)}</div>`
         : '';
@@ -629,10 +672,10 @@ function renderApprovals() {
             <button class="btn btn-primary btn-sm" style="width:100%;" onclick="ackItem('${esc(l.request_id)}')">👍 รับทราบ</button>
           </div>`;
       const dText = l.end_date && l.end_date !== l.start_date ? `${thaiDate(l.start_date)} – ${thaiDate(l.end_date)}` : thaiDate(l.start_date);
-      return `<div class="item"><div class="item-ico" style="background:var(--brand-soft)">${l.leave_type === 'ลาป่วย' ? '🤒' : '📋'}</div><div class="item-body">
+      return `<div class="item"><div class="item-ico" style="background:var(--brand-soft)">${l.leave_type === 'ลาป่วย' ? '🤒' : l.leave_type === 'ลาอบรม' ? '🎓' : '📋'}</div><div class="item-body">
         <div class="item-title">${esc(l.name)} • ${esc(l.leave_type)} ${esc(leaveDur(l))}</div>
         <div class="item-meta">📅 ${esc(dText)}<br>💬 ${esc(l.reason || '-')}</div>
-        ${sickBox}${consecBox}${actionHtml}
+        ${sickBox}${personalWarnBox}${consecBox}${actionHtml}
       </div></div>`;
     }).join('');
   }

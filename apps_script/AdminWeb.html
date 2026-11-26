@@ -791,10 +791,20 @@
     }
 
     function leaveCard(l, mode) {
-      const icon = l.leave_type === 'ลาป่วย' ? '🤒' : l.leave_type === 'ลาพักร้อน' ? '🌴' : '💼';
+      const icon = l.leave_type === 'ลาป่วย' ? '🤒' : l.leave_type === 'ลาพักร้อน' ? '🌴' : l.leave_type === 'ลาอบรม' ? '🎓' : '💼';
       const dur = l.duration_mode === 'HOURS' ? `${l.hours} ชม.` : `${l.days} วัน`;
       const dText = l.start_date === l.end_date ? shortDate(l.start_date) : `${shortDate(l.start_date)} – ${shortDate(l.end_date)}`;
       let extraHtml = '';
+      if (l.vacation_info) {
+        extraHtml += `<div style="margin-top:6px; font-size:12.5px; color:#15803d; background:#dcfce7; padding:6px 10px; border-radius:8px;">
+          🌴 สิทธิ์ลาพักร้อนคงเหลือของ ${esc(l.name)}: <b>${l.vacation_info.remainingDays}/${l.vacation_info.limitDays} วัน</b> (ใช้ไปแล้ว ${l.vacation_info.usedDays} วัน)
+        </div>`;
+      }
+      if (l.personal_warning) {
+        extraHtml += `<div style="margin-top:6px; font-size:12.5px; color:#991b1b; background:#fee2e2; padding:6px 10px; border-radius:8px; font-weight:600;">
+          ⚠️ ${esc(l.personal_warning)}
+        </div>`;
+      }
       if (l.sick_info) {
         const si = l.sick_info;
         const seqTxt = l.sub_type === 'SICK_NO_CERT'
