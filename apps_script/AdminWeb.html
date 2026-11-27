@@ -1452,9 +1452,11 @@
     let PAYROLL_CACHE = { periodTitle: '', employees: [], sheetUrl: '' };
     let PAYROLL_SELECTED_IDX = 0;
     let PAYROLL_SEARCH = '';
+    let PAYROLL_TS_CACHE = {};
     const fmtBaht = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     async function loadPayroll() {
+      PAYROLL_TS_CACHE = {};
       try {
         const res = await call('adminGetPayrollData', $('monthPicker').value);
         PAYROLL_CACHE = res;
@@ -1666,6 +1668,7 @@
           </div>
         </div>`;
       updatePayrollLive();
+      prefetchPayrollTimesheet(e);
     }
 
     function updatePayrollLive() {
@@ -1760,17 +1763,47 @@
       } catch (err) { toast(err.message, 'error'); }
     }
 
-    async function showPayrollTimeDetail(kind) {
-      const e = (PAYROLL_CACHE.employees || [])[PAYROLL_SELECTED_IDX];
-      if (!e) return;
+    function resolvePayrollEmpId(e) {
       const normCode = v => String(v || '').trim().replace(/^0+/, '') || String(v || '').trim();
       const matched = (STATE.employees || []).find(x => normCode(x.code || x.employee_id) === normCode(e.code)) ||
                       (STATE.employees || []).find(x => x.name === e.name);
-      const empId = matched ? matched.employee_id : e.code;
+      return matched ? matched.employee_id : e.code;
+    }
+
+    function prefetchPayrollTimesheet(e) {
+      if (!e) return;
+      const empId = resolvePayrollEmpId(e);
       const ym = $('monthPicker').value;
+      const key = empId + '|' + ym;
+      if (PAYROLL_TS_CACHE[key]) return;
+      // เก็บ Promise ไว้เลย ถ้าผู้ใช้คลิกก่อนโหลดเสร็จจะรอ Promise เดิม ไม่ยิงซ้ำ
+      PAYROLL_TS_CACHE[key] = new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(res => { PAYROLL_TS_CACHE[key] = res; resolve(res); })
+          .withFailureHandler(err => { delete PAYROLL_TS_CACHE[key]; reject(err); })
+          .adminGetIndividualTimesheet(SECRET, empId, ym);
+      });
+    }
+
+    async function showPayrollTimeDetail(kind) {
+      const e = (PAYROLL_CACHE.employees || [])[PAYROLL_SELECTED_IDX];
+      if (!e) return;
+      const empId = resolvePayrollEmpId(e);
+      const ym = $('monthPicker').value;
+      const key = empId + '|' + ym;
 
       try {
-        const d = await call('adminGetIndividualTimesheet', empId, ym);
+        let d;
+        const cached = PAYROLL_TS_CACHE[key];
+        if (cached && typeof cached.then === 'function') {
+          setLoading(true);
+          try { d = await cached; } finally { setLoading(false); }
+        } else if (cached) {
+          d = cached; // 0ms instant!
+        } else {
+          d = await call('adminGetIndividualTimesheet', empId, ym);
+          PAYROLL_TS_CACHE[key] = d;
+        }
         const empName = e.name + (e.nickname && e.nickname !== e.name ? ` (${e.nickname})` : '');
         let syncBanner = '';
         const s = d.summary || {};
