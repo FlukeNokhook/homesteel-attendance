@@ -630,11 +630,12 @@
                   <span>เงื่อนไข:</span>
                   <span class="rate-pill">อายุงานครบ 1 ปีขึ้นไป</span>
                   <span class="rate-pill">พนักงานสะสม 1–15%</span>
-                  <span class="rate-pill">บริษัทสมทบสูงสุด 2% (อายุงาน 1–2 ปี)</span>
-                  <span class="rate-pill">บริษัทสมทบสูงสุด 3% (อายุงาน 3 ปี+)</span>
+                  <span class="rate-pill">อายุสมาชิกปีแรก สมทบสูงสุด 2%</span>
+                  <span class="rate-pill">อายุสมาชิก 1 ปี+ สมทบสูงสุด 3%</span>
                 </div>
               </div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button class="btn btn-soft-green btn-sm" onclick="exportPvdCsv()">⬇️ Export ไฟล์นำส่งกองทุนฯ (CSV)</button>
                 <button class="btn btn-ghost btn-sm" onclick="loadPvdTab(true)">🔄 โหลดข้อมูล</button>
                 <button class="btn btn-primary btn-sm" onclick="savePvdTab()">💾 บันทึกอัตรา PVD</button>
               </div>
@@ -677,40 +678,65 @@
 
       <!-- Tab: Settings -->
       <section id="tab-settings" class="hidden">
-        <div class="callout info">
-          <span>💡</span>
-          <div>จัดการการตั้งค่าทั้งหมดได้จากหน้านี้โดยไม่ต้องเปิด Google Sheet — เมื่อเพิ่ม แก้ไข หรือลบ <b>วันหยุดนักขัตฤกษ์</b> ระบบจะคำนวณตารางเวลา (<code>Attendance_Daily</code>) ของเดือนนั้นให้อัตโนมัติทันทีครับ</div>
+        <div class="subtabs">
+          <button class="subtab-btn active" data-ssub="employees" onclick="switchSettingsSub('employees')">👥 ทะเบียนพนักงาน</button>
+          <button class="subtab-btn" data-ssub="holidays" onclick="switchSettingsSub('holidays')">📅 วันหยุดนักขัตฤกษ์</button>
         </div>
 
-        <div class="card">
-          <div class="card-head">
-            <div>
-              <h3 class="card-title">📅 วันหยุดนักขัตฤกษ์ (Holidays)</h3>
-              <div class="card-sub">ใช้กำหนดวันหยุดบริษัทในตารางเวลา การนับวันลาล่วงหน้า 3 วัน และการคิดเงินเดือน</div>
+        <!-- Settings Sub-tab 1: Employee Directory -->
+        <div id="ssub-employees">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3 class="card-title">👥 ทะเบียนพนักงาน (จัดการได้ครบทุกช่อง A–U)</h3>
+                <div class="card-sub">ข้อมูลส่วนตัว (บัตร ปชช. / ที่อยู่ / บัญชีธนาคาร) เก็บเป็นความลับเฉพาะผู้ดูแลระบบ (PDPA)</div>
+              </div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <input id="empDirSearch" class="input" style="width:200px; padding:7px 10px; font-size:13px;" placeholder="🔍 ค้นหาชื่อ / รหัส / แผนก..." oninput="renderEmpDirectory()" />
+                <select id="empDirStatus" class="select" style="width:auto; padding:7px 10px; font-size:13px;" onchange="renderEmpDirectory()">
+                  <option value="ACTIVE">เฉพาะ ACTIVE</option>
+                  <option value="ALL">ทั้งหมด</option>
+                  <option value="INACTIVE">เฉพาะ INACTIVE</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="openEmpFormModal(null)">➕ เพิ่มพนักงานใหม่</button>
+              </div>
             </div>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <select id="holidayYearFilter" class="select" style="width:auto; min-width:130px;" onchange="renderHolidays()">
-                <option value="ALL">ทุกปี</option>
-              </select>
-              <button class="btn btn-ghost btn-sm" onclick="loadHolidays()">🔄 รีเฟรช</button>
-            </div>
+            <div id="empDirTable"></div>
           </div>
+        </div>
 
-          <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; padding:14px; background:#f8fafc; border:1px solid var(--border); border-radius:10px; margin-bottom:16px;">
-            <div style="flex:0 0 180px;">
-              <label class="card-sub" for="newHolidayDate" style="display:block; margin-bottom:4px;">วันที่</label>
-              <input type="date" id="newHolidayDate" class="input" />
+        <!-- Settings Sub-tab 2: Holidays -->
+        <div id="ssub-holidays" class="hidden">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3 class="card-title">📅 วันหยุดนักขัตฤกษ์ (Holidays)</h3>
+                <div class="card-sub">เมื่อเพิ่ม แก้ไข หรือลบวันหยุด ระบบจะอัปเดตตารางเวลาของเดือนนั้นให้อัตโนมัติทันที</div>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <select id="holidayYearFilter" class="select" style="width:auto; min-width:130px;" onchange="renderHolidays()">
+                  <option value="ALL">ทุกปี</option>
+                </select>
+                <button class="btn btn-ghost btn-sm" onclick="loadHolidays()">🔄 รีเฟรช</button>
+              </div>
             </div>
-            <div style="flex:1 1 240px;">
-              <label class="card-sub" for="newHolidayName" style="display:block; margin-bottom:4px;">ชื่อวันหยุด</label>
-              <input type="text" id="newHolidayName" class="input" placeholder="เช่น วันปิยมหาราช, วันแรงงานแห่งชาติ" onkeydown="if(event.key==='Enter') addHolidayItem()" />
+
+            <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; padding:14px; background:#f8fafc; border:1px solid var(--border); border-radius:10px; margin-bottom:16px;">
+              <div style="flex:0 0 180px;">
+                <label class="card-sub" for="newHolidayDate" style="display:block; margin-bottom:4px;">วันที่</label>
+                <input type="date" id="newHolidayDate" class="input" />
+              </div>
+              <div style="flex:1 1 240px;">
+                <label class="card-sub" for="newHolidayName" style="display:block; margin-bottom:4px;">ชื่อวันหยุด</label>
+                <input type="text" id="newHolidayName" class="input" placeholder="เช่น วันปิยมหาราช, วันแรงงานแห่งชาติ" onkeydown="if(event.key==='Enter') addHolidayItem()" />
+              </div>
+              <div>
+                <button class="btn btn-primary" onclick="addHolidayItem()">➕ เพิ่มวันหยุด</button>
+              </div>
             </div>
-            <div>
-              <button class="btn btn-primary" onclick="addHolidayItem()">➕ เพิ่มวันหยุด</button>
-            </div>
+
+            <div id="holidaysTable"></div>
           </div>
-
-          <div id="holidaysTable"></div>
         </div>
       </section>
     </main>
@@ -853,7 +879,7 @@
       if (tab === 'matrix') loadMatrix();
       if (tab === 'person') loadPerson();
       if (tab === 'payroll') { loadPayroll(); loadBonuses(); }
-      if (tab === 'settings') loadHolidays();
+      if (tab === 'settings') { loadEmpDirectory(); loadHolidays(); }
     }
 
     async function loadMatrix() {
@@ -2682,22 +2708,50 @@
     /* ================= Provident Fund (PVD) ================= */
     let PVD_ROWS = [];
 
-    function calcTenureInfo(hireIso, ym) {
-      if (!hireIso || !/^\d{4}-\d{2}-\d{2}$/.test(hireIso)) {
-        return { known: false, years: 0, months: 0, eligible: true, coCapPct: 2, label: 'ไม่ระบุวันเริ่มงาน' };
+    function diffYmd(fromIso, refDate) {
+      const h = new Date(fromIso + 'T00:00:00');
+      let years = refDate.getFullYear() - h.getFullYear();
+      let months = refDate.getMonth() - h.getMonth();
+      let days = refDate.getDate() - h.getDate();
+      if (days < 0) {
+        const prevMonthLast = new Date(refDate.getFullYear(), refDate.getMonth(), 0).getDate();
+        days += prevMonthLast;
+        months--;
       }
+      if (months < 0) { months += 12; years--; }
+      if (years < 0) return { years: 0, months: 0, days: 0 };
+      return { years, months, days };
+    }
+
+    function fmtThaiDmy(iso) {
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '-';
+      const [y, m, d] = iso.split('-').map(Number);
+      return `${d}/${String(m).padStart(2, '0')}/${y + 543}`;
+    }
+
+    function calcPvdEligibility(hireIso, pvdJoinIso, ym) {
       const [y, m] = (ym || ymNow()).split('-').map(Number);
       const refDate = new Date(y, m, 0); // วันสิ้นเดือนของงวดที่เลือก
-      const h = new Date(hireIso + 'T00:00:00');
-      let totalMonths = (refDate.getFullYear() - h.getFullYear()) * 12 + (refDate.getMonth() - h.getMonth());
-      if (refDate.getDate() < h.getDate()) totalMonths--;
-      if (totalMonths < 0) totalMonths = 0;
-      const yrs = Math.floor(totalMonths / 12);
-      const remM = totalMonths % 12;
-      const eligible = yrs >= 1;
-      const coCapPct = !eligible ? 0 : (yrs >= 3 ? 3 : 2);
-      const label = yrs > 0 ? `${yrs} ปี${remM > 0 ? ' ' + remM + ' ด.' : ''}` : `${remM} เดือน`;
-      return { known: true, years: yrs, months: remM, eligible: eligible, coCapPct: coCapPct, label: label };
+      const hasJoin = !!(pvdJoinIso && /^\d{4}-\d{2}-\d{2}$/.test(pvdJoinIso));
+      const hasHire = !!(hireIso && /^\d{4}-\d{2}-\d{2}$/.test(hireIso));
+
+      const hireDiff = hasHire ? diffYmd(hireIso, refDate) : { years: 1, months: 0, days: 0 };
+      const eligible = hasJoin || (hireDiff.years >= 1);
+
+      let memberLabel = '';
+      let coCapPct = 0;
+      if (hasJoin) {
+        const md = diffYmd(pvdJoinIso, refDate);
+        memberLabel = `${md.years} ปี ${md.months} เดือน ${md.days} วัน`;
+        coCapPct = md.years >= 1 ? 3 : 2;
+      } else if (eligible) {
+        memberLabel = `อายุงาน ${hireDiff.years} ปี ${hireDiff.months} ด. (ยังไม่ระบุวันเข้ากองทุน)`;
+        coCapPct = 2;
+      } else {
+        memberLabel = `อายุงาน ${hireDiff.months} เดือน (ยังไม่ครบ 1 ปี)`;
+        coCapPct = 0;
+      }
+      return { eligible, hasJoin, coCapPct, memberLabel };
     }
 
     function calcPvdAmounts(r) {
@@ -2716,18 +2770,23 @@
         }
         const ym = $('monthPicker').value;
         PVD_ROWS = (PAYROLL_CACHE.employees || []).map(e => {
-          const t = calcTenureInfo(e.hire_date_iso, ym);
+          const info = calcPvdEligibility(e.hire_date_iso, e.pvd_join_date, ym);
           const rawPct = Math.round((Number(e.pvd_rate) || 0) * 1000) / 10;
           return {
             rowIndex: e.rowIndex,
             code: e.code,
+            title: e.title || '',
             name: e.name,
             nickname: e.nickname,
+            national_id: e.national_id || '',
+            email: e.email || '',
+            pvd_join_date: e.pvd_join_date || '',
             base_salary: Number(e.base_salary) || 0,
-            tenureLabel: t.label,
-            eligible: t.eligible,
-            coCapPct: t.coCapPct,
-            pvd_pct: t.eligible ? rawPct : 0
+            memberLabel: info.memberLabel,
+            eligible: info.eligible,
+            hasJoin: info.hasJoin,
+            coCapPct: info.coCapPct,
+            pvd_pct: info.eligible ? rawPct : 0
           };
         });
         renderPvdTab();
@@ -2745,9 +2804,9 @@
           <tr>
             <th style="width:36px;">#</th>
             <th>ชื่อ-สกุล (ชื่อเล่น)</th>
-            <th>อายุงาน / เพดานบริษัท</th>
+            <th>วันเริ่มเป็นสมาชิก / อายุสมาชิก</th>
             <th class="num">ฐานเงินเดือน</th>
-            <th style="width:230px;">พนักงานสะสม (1–15%)</th>
+            <th style="width:225px;">พนักงานสะสม (1–15%)</th>
             <th class="num">หักพนักงาน</th>
             <th class="num">สมทบบริษัท</th>
             <th class="num">นำส่งรวม</th>
@@ -2756,14 +2815,17 @@
         <tbody>${PVD_ROWS.map((r, i) => {
           const c = calcPvdAmounts(r);
           const capBadge = !r.eligible
-            ? `<span class="pill pill-amber">⏳ ${esc(r.tenureLabel)} (ยังไม่ครบ 1 ปี)</span>`
+            ? `<span class="pill pill-amber">⏳ ${esc(r.memberLabel)}</span>`
             : (r.coCapPct >= 3
-              ? `<span class="pill pill-green">${esc(r.tenureLabel)} • สูงสุด 3%</span>`
-              : `<span class="pill pill-blue">${esc(r.tenureLabel)} • สูงสุด 2%</span>`);
+              ? `<span class="pill pill-green">${esc(r.memberLabel)} • สูงสุด 3%</span>`
+              : `<span class="pill pill-blue">${esc(r.memberLabel)} • สูงสุด 2%</span>`);
           return `<tr style="${r.eligible ? '' : 'opacity:.6; background:#f8fafc;'}">
             <td>${i + 1}</td>
-            <td><b>${esc(r.name)}</b>${r.nickname && r.nickname !== r.name ? ` <span class="card-sub">(${esc(r.nickname)})</span>` : ''}<div class="card-sub mono">${esc(r.code)}</div></td>
-            <td>${capBadge}</td>
+            <td><b>${esc(r.title ? r.title + ' ' : '')}${esc(r.name)}</b>${r.nickname && r.nickname !== r.name ? ` <span class="card-sub">(${esc(r.nickname)})</span>` : ''}<div class="card-sub mono">${esc(r.code)}</div></td>
+            <td>
+              ${r.hasJoin ? `<div style="font-size:12px; font-weight:600; margin-bottom:2px;">เริ่ม ${esc(fmtThaiDmy(r.pvd_join_date))}</div>` : ''}
+              ${capBadge}
+            </td>
             <td class="num">${fmtBaht(r.base_salary)}</td>
             <td>
               ${r.eligible ? `<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -2835,6 +2897,180 @@
         toast(res.updatedCount ? `บันทึกอัตรา PVD (${res.updatedCount} คน) ลง Calculation เรียบร้อย` : 'ไม่มีอัตรา PVD ที่เปลี่ยนแปลงครับ', 'success');
         loadPvdTab(false);
       } catch (err) { toast(err.message, 'error'); }
+    }
+
+    function exportPvdCsv() {
+      const members = PVD_ROWS.filter(r => r.eligible && r.pvd_pct > 0);
+      if (!members.length) { toast('ยังไม่มีสมาชิกกองทุนฯ ที่มีการหักสะสมในเดือนนี้ครับ', 'error'); return; }
+      const q = v => '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
+      const headers = ['รหัสสมาชิก', 'คำนำหน้าชื่อ', 'ชื่อ', 'นามสกุล', 'วันเริ่มเป็นสมาชิก', 'เงินสะสม (%)', 'เงินสมทบ (%)', 'เงินสะสม (บาท)', 'เงินสมทบ (บาท)', 'รวมนำส่ง (บาท)', 'อายุสมาชิก', 'เลขประจำตัวประชาชน', 'อีเมล'];
+      const lines = [headers.map(q).join(',')];
+      members.forEach(r => {
+        const c = calcPvdAmounts(r);
+        const parts = String(r.name || '').trim().split(/\s+/);
+        const firstName = parts[0] || '';
+        const lastName = parts.slice(1).join(' ');
+        lines.push([
+          r.code, r.title, firstName, lastName, fmtThaiDmy(r.pvd_join_date),
+          c.empPct + '%', c.coPct + '%', c.empAmt.toFixed(2), c.coAmt.toFixed(2), c.totalAmt.toFixed(2),
+          r.memberLabel, r.national_id, r.email
+        ].map(q).join(','));
+      });
+      saveCsvFile('\uFEFF' + lines.join('\r\n'), `PVD_Submit_${$('monthPicker').value}.csv`);
+      toast(`ดาวน์โหลดไฟล์นำส่งกองทุนฯ (${members.length} คน) เรียบร้อย`, 'success');
+    }
+
+    /* ================= Settings: Employee Directory (Admin Only / PDPA) ================= */
+    let EMP_DIR_CACHE = [];
+
+    function switchSettingsSub(sub) {
+      document.querySelectorAll('.subtab-btn[data-ssub]').forEach(b => b.classList.toggle('active', b.dataset.ssub === sub));
+      ['employees', 'holidays'].forEach(s => $('ssub-' + s).classList.toggle('hidden', s !== sub));
+      if (sub === 'employees') loadEmpDirectory();
+      if (sub === 'holidays') loadHolidays();
+    }
+
+    async function loadEmpDirectory() {
+      try {
+        EMP_DIR_CACHE = await call('adminGetAllEmployees') || [];
+        renderEmpDirectory();
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    function renderEmpDirectory() {
+      const q = ($('empDirSearch') ? $('empDirSearch').value : '').trim().toLowerCase();
+      const st = $('empDirStatus') ? $('empDirStatus').value : 'ACTIVE';
+      const list = EMP_DIR_CACHE.filter(e => {
+        if (st !== 'ALL' && String(e.status).toUpperCase() !== st) return false;
+        if (!q) return true;
+        return (`${e.employee_id} ${e.code} ${e.name} ${e.nickname} ${e.department} ${e.position} ${e.fingerprint_id}`).toLowerCase().includes(q);
+      });
+      if (!list.length) {
+        $('empDirTable').innerHTML = emptyState('👥', 'ไม่พบข้อมูลพนักงานตามเงื่อนไขที่ค้นหา');
+        return;
+      }
+      $('empDirTable').innerHTML = `<div class="table-wrap"><table>
+        <thead>
+          <tr>
+            <th>รหัส</th>
+            <th>ชื่อ-สกุล (ชื่อเล่น)</th>
+            <th>แผนก / ตำแหน่ง</th>
+            <th>รหัสนิ้ว</th>
+            <th>เริ่มงาน / กองทุนฯ</th>
+            <th>พักร้อน</th>
+            <th>ธนาคาร / บัตร ปชช.</th>
+            <th>สถานะ</th>
+            <th style="text-align:right;">จัดการ</th>
+          </tr>
+        </thead>
+        <tbody>${list.map(e => `<tr>
+          <td><div class="mono" style="font-weight:600;">${esc(e.code || '-')}</div><div class="card-sub">ID #${esc(e.employee_id)}</div></td>
+          <td><b>${esc(e.title ? e.title + ' ' : '')}${esc(e.name)}</b>${e.nickname && e.nickname !== e.name ? ` <span class="card-sub">(${esc(e.nickname)})</span>` : ''}<div class="card-sub">${esc(e.email || e.phone || '')}</div></td>
+          <td><div>${esc(e.department || '-')}</div><div class="card-sub">${esc(e.position || '')}</div></td>
+          <td class="mono">${esc(e.fingerprint_id || '-')}</td>
+          <td style="font-size:12px;"><div>งาน: ${esc(fmtThaiDmy(e.hire_date))}</div>${e.pvd_join_date ? `<div style="color:#15803d;">PVD: ${esc(fmtThaiDmy(e.pvd_join_date))}</div>` : '<div class="card-sub">PVD: -</div>'}</td>
+          <td class="mono">${esc(e.vacation_quota || '6')} วัน</td>
+          <td style="font-size:12px;"><div>${esc(e.bank_name ? e.bank_name + ' ' + e.bank_account : (e.bank_account || '-'))}</div><div class="card-sub mono">${esc(e.national_id || '')}</div></td>
+          <td><span class="pill ${String(e.status).toUpperCase() === 'ACTIVE' ? 'pill-green' : 'pill-gray'}">${esc(e.status)}</span></td>
+          <td style="text-align:right; white-space:nowrap;">
+            <button class="btn btn-soft-blue btn-sm" onclick="openEmpFormModal('${esc(e.employee_id)}')">✏️ แก้ไข</button>
+          </td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+    }
+
+    function openEmpFormModal(empId) {
+      const isEdit = empId !== null && empId !== undefined && empId !== '';
+      const e = isEdit ? EMP_DIR_CACHE.find(x => String(x.employee_id) === String(empId)) : {
+        employee_id: '', code: '', title: '', name: '', nickname: '', department: '', position: '',
+        fingerprint_id: '', line_user_id: '', role: 'employee', supervisor_id: '', status: 'ACTIVE',
+        hire_date: '', vacation_quota: '6', national_id: '', email: '', phone: '', address: '',
+        bank_name: '', bank_account: '', pvd_join_date: ''
+      };
+      if (!e) return;
+
+      const root = $('modalRoot');
+      root.innerHTML = `<div class="modal-bg"><div class="modal wide">
+        <h3>${isEdit ? '✏️ แก้ไขทะเบียนพนักงาน • ' + esc(e.name) : '➕ เพิ่มพนักงานใหม่'}</h3>
+        <div style="display:grid; gap:14px; margin-top:10px;">
+          <div style="padding:12px; background:#f8fafc; border:1px solid var(--border); border-radius:10px;">
+            <div style="font-weight:700; font-size:13.5px; margin-bottom:8px; color:#1e3a8a;">1. ข้อมูลงานและระบบ (คอลัมน์ A–M)</div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px;">
+              <div><label class="card-sub">Employee ID ${isEdit ? '(ห้ามเปลี่ยน)' : '(ว่าง = สร้างอัตโนมัติ)'}</label><input id="efId" class="input" value="${esc(e.employee_id)}" ${isEdit ? 'disabled' : ''} /></div>
+              <div><label class="card-sub">รหัสพนักงาน (code)</label><input id="efCode" class="input" value="${esc(e.code)}" placeholder="เช่น 0102030" /></div>
+              <div><label class="card-sub">คำนำหน้าชื่อ</label><select id="efTitle" class="select"><option value="">-</option><option value="นาย" ${e.title==='นาย'?'selected':''}>นาย</option><option value="นาง" ${e.title==='นาง'?'selected':''}>นาง</option><option value="นางสาว" ${e.title==='นางสาว'?'selected':''}>นางสาว</option></select></div>
+              <div style="grid-column:span 2;"><label class="card-sub">ชื่อ-นามสกุล *</label><input id="efName" class="input" value="${esc(e.name)}" placeholder="ชื่อ นามสกุล" /></div>
+              <div><label class="card-sub">ชื่อเล่น</label><input id="efNick" class="input" value="${esc(e.nickname)}" /></div>
+              <div><label class="card-sub">แผนก (department)</label><input id="efDept" class="input" value="${esc(e.department)}" placeholder="พนักงานขาย / ผลิตและจัดส่ง" /></div>
+              <div><label class="card-sub">ตำแหน่ง (position)</label><input id="efPos" class="input" value="${esc(e.position)}" /></div>
+              <div><label class="card-sub">รหัสสแกนนิ้ว (fingerprint_id)</label><input id="efFp" class="input" value="${esc(e.fingerprint_id)}" /></div>
+              <div><label class="card-sub">วันเริ่มงาน (hire_date)</label><input id="efHire" type="date" class="input" value="${esc(e.hire_date)}" /></div>
+              <div><label class="card-sub">โควตาพักร้อน (วัน/ปี)</label><input id="efVac" type="number" min="0" max="30" class="input" value="${esc(e.vacation_quota || '6')}" /></div>
+              <div><label class="card-sub">สิทธิ์ (role)</label><select id="efRole" class="select"><option value="employee" ${e.role==='employee'?'selected':''}>employee</option><option value="supervisor" ${e.role==='supervisor'?'selected':''}>supervisor</option><option value="admin" ${e.role==='admin'?'selected':''}>admin</option></select></div>
+              <div><label class="card-sub">สถานะ (status)</label><select id="efStatus" class="select"><option value="ACTIVE" ${String(e.status).toUpperCase()==='ACTIVE'?'selected':''}>ACTIVE</option><option value="INACTIVE" ${String(e.status).toUpperCase()==='INACTIVE'?'selected':''}>INACTIVE</option></select></div>
+              <div><label class="card-sub">รหัสหัวหน้า (supervisor_id)</label><input id="efSup" class="input" value="${esc(e.supervisor_id)}" /></div>
+              <div style="grid-column:span 2;"><label class="card-sub">LINE User ID</label><input id="efLine" class="input mono" value="${esc(e.line_user_id)}" placeholder="U..." /></div>
+            </div>
+          </div>
+
+          <div style="padding:12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px;">
+            <div style="font-weight:700; font-size:13.5px; margin-bottom:8px; color:#166534;">2. ข้อมูลส่วนตัว บัญชีธนาคาร และกองทุนสำรองฯ (PDPA)</div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(175px,1fr)); gap:8px;">
+              <div><label class="card-sub">เลขประจำตัวประชาชน</label><input id="efNatId" class="input mono" value="${esc(e.national_id)}" placeholder="1-4099-00000-00-0" /></div>
+              <div><label class="card-sub">อีเมล (สำหรับกองทุนฯ)</label><input id="efEmail" type="email" class="input" value="${esc(e.email)}" /></div>
+              <div><label class="card-sub">เบอร์โทรศัพท์</label><input id="efPhone" class="input" value="${esc(e.phone)}" /></div>
+              <div><label class="card-sub">ธนาคาร</label><input id="efBank" class="input" value="${esc(e.bank_name)}" placeholder="เช่น กสิกรไทย / SCB / กรุงไทย" /></div>
+              <div><label class="card-sub">เลขที่บัญชี</label><input id="efBankAcc" class="input mono" value="${esc(e.bank_account)}" /></div>
+              <div><label class="card-sub">วันเริ่มเป็นสมาชิกกองทุนฯ (PVD)</label><input id="efPvdJoin" type="date" class="input" value="${esc(e.pvd_join_date)}" /></div>
+              <div style="grid-column:1 / -1;"><label class="card-sub">ที่อยู่</label><textarea id="efAddr" class="textarea" rows="2" placeholder="บ้านเลขที่ ตำบล อำเภอ จังหวัด รหัสไปรษณีย์">${esc(e.address)}</textarea></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" data-act="cancel">ยกเลิก</button>
+          <button class="btn btn-primary" data-act="ok">💾 บันทึกข้อมูลพนักงาน</button>
+        </div>
+      </div></div>`;
+      const close = () => { root.innerHTML = ''; };
+      root.querySelector('[data-act="cancel"]').onclick = close;
+      root.querySelector('.modal-bg').onclick = ev => { if (ev.target.classList.contains('modal-bg')) close(); };
+      root.querySelector('[data-act="ok"]').onclick = async () => {
+        const nameVal = $('efName').value.trim();
+        if (!nameVal) { toast('กรุณาระบุชื่อ-นามสกุลพนักงานครับ', 'error'); return; }
+        const payload = {
+          isEdit: isEdit,
+          original_employee_id: e.employee_id,
+          employee_id: $('efId').value.trim(),
+          code: $('efCode').value.trim(),
+          title: $('efTitle').value,
+          name: nameVal,
+          nickname: $('efNick').value.trim(),
+          department: $('efDept').value.trim(),
+          position: $('efPos').value.trim(),
+          fingerprint_id: $('efFp').value.trim(),
+          hire_date: $('efHire').value,
+          vacation_quota: $('efVac').value,
+          role: $('efRole').value,
+          status: $('efStatus').value,
+          supervisor_id: $('efSup').value.trim(),
+          line_user_id: $('efLine').value.trim(),
+          national_id: $('efNatId').value.trim(),
+          email: $('efEmail').value.trim(),
+          phone: $('efPhone').value.trim(),
+          bank_name: $('efBank').value.trim(),
+          bank_account: $('efBankAcc').value.trim(),
+          pvd_join_date: $('efPvdJoin').value,
+          address: $('efAddr').value.trim()
+        };
+        close();
+        try {
+          const res = await call('adminSaveEmployee', payload);
+          EMP_DIR_CACHE = res.employees || [];
+          renderEmpDirectory();
+          toast(isEdit ? 'บันทึกข้อมูลพนักงานเรียบร้อย' : 'เพิ่มพนักงานใหม่เรียบร้อย', 'success');
+          loadInit();
+        } catch (err) { toast(err.message, 'error'); }
+      };
     }
   </script>
 </body>

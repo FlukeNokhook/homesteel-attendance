@@ -10,7 +10,7 @@
  * - แยกข้อมูลสแกนนิ้วดิบรายปี (Attendance_Raw_YYYY หรือแยกไฟล์ Spreadsheet ตาม RAW_SPREADSHEET_ID_YYYY ใน Settings)
  */
 
-const DATE_COLS = ['work_date', 'start_date', 'end_date', 'ot_date', 'holiday_date', 'hire_date'];
+const DATE_COLS = ['work_date', 'start_date', 'end_date', 'ot_date', 'holiday_date', 'hire_date', 'pvd_join_date'];
 const TIME_COLS = ['first_in', 'last_out', 'requested_start', 'requested_end', 'approved_start', 'approved_end', 'actual_start', 'actual_end', 'approx_time'];
 const YM_COLS = ['year_month', 'period_id'];
 

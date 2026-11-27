@@ -311,6 +311,12 @@ function getPayrollDashboardData() {
   const numVal = v => { const n = Number(v); return isNaN(n) ? 0 : Math.round(n * 100) / 100; };
   const dateFmt = v => (v instanceof Date ? Utilities.formatDate(v, TIMEZONE, 'dd/MM/yyyy') : String(v || ''));
 
+  const empProfileByCode = {};
+  repoGetEmployees().forEach(e => {
+    const k = normEmpCode(e.code || e.employee_id);
+    if (k) empProfileByCode[k] = e;
+  });
+
   const employees = [];
   const startRow = isCleanLayout ? 1 : 2;
   for (let r = startRow; r < values.length; r++) {
@@ -320,12 +326,17 @@ function getPayrollDashboardData() {
     const nickname = String(row[2] || '').trim();
     if (!name && !nickname) continue;
     if (name.indexOf('รวม') === 0 || code.indexOf('รวม') === 0) continue;
+    const prof = empProfileByCode[normEmpCode(code)] || {};
 
     if (isCleanLayout) {
       employees.push({
         rowIndex: r + 1,
         code: code, name: name, nickname: nickname, position: String(row[3] || ''),
-        hire_date: dateFmt(row[4]), hire_date_iso: repoNormalizeDate(row[4]),
+        title: String(prof.title || ''),
+        national_id: String(prof.national_id || ''),
+        email: String(prof.email || ''),
+        pvd_join_date: repoNormalizeDate(prof.pvd_join_date || ''),
+        hire_date: dateFmt(row[4]), hire_date_iso: repoNormalizeDate(prof.hire_date || row[4]),
         base_salary: numVal(row[5]),
         work_days: numVal(row[6]), work_hours: numVal(row[7]), ot15_hours: numVal(row[8]), late_min: numVal(row[9]), absent_hours: numVal(row[10]),
         ot_baht: numVal(row[11]), commission: numVal(row[12]), measurement: numVal(row[13]), frame_bonus: numVal(row[14]),
@@ -334,7 +345,7 @@ function getPayrollDashboardData() {
         deduct_uniform: numVal(row[22]), deduct_goods: numVal(row[23]), deduct_damage: numVal(row[24]),
         deduct_other: numVal(row[25]), deduct_forbid_absent: numVal(row[26]),
         gross_income: numVal(row[27]), sso: numVal(row[28]), tax: numVal(row[29]), net_pay: numVal(row[30]),
-        bank: String(row[31] || ''), bank_account: String(row[32] || '')
+        bank: String(prof.bank_name || row[31] || ''), bank_account: String(prof.bank_account || row[32] || '')
       });
     } else {
       employees.push({
@@ -1058,4 +1069,120 @@ function savePvdRates(updatesList, actor) {
     repoAppendAuditLog(actor || 'admin', 'UPDATE_PVD_RATES', 'Calculation', 'PVD_BATCH', null, changed, 'แก้ไขอัตรากองทุนสำรองเลี้ยงชีพ (PVD) จาก Dashboard');
   }
   return { ok: true, updatedCount: changed.length, payroll: getPayrollDashboardData() };
+}
+
+/* ================= Employee Directory Management (Admin Only / PDPA) ================= */
+
+function listAllEmployeesAdmin() {
+  ensureEmployeeProfileColumns();
+  return repoReadAll(SHEETS.EMPLOYEES).rows.map(e => ({
+    rowIndex: e._rowIndex,
+    employee_id: String(e.employee_id || ''),
+    code: String(e.code || ''),
+    title: String(e.title || ''),
+    name: String(e.name || ''),
+    nickname: String(e.nickname || ''),
+    department: String(e.department || ''),
+    position: String(e.position || ''),
+    fingerprint_id: String(e.fingerprint_id || ''),
+    line_user_id: String(e.line_user_id || ''),
+    role: String(e.role || 'employee'),
+    supervisor_id: String(e.supervisor_id || ''),
+    status: String(e.status || 'ACTIVE'),
+    hire_date: repoNormalizeDate(e.hire_date || ''),
+    vacation_quota: e.vacation_quota !== '' ? String(e.vacation_quota) : '6',
+    national_id: String(e.national_id || ''),
+    email: String(e.email || ''),
+    phone: String(e.phone || ''),
+    address: String(e.address || ''),
+    bank_name: String(e.bank_name || ''),
+    bank_account: String(e.bank_account || ''),
+    pvd_join_date: repoNormalizeDate(e.pvd_join_date || '')
+  }));
+}
+
+function saveEmployeeAdmin(payload, actor) {
+  ensureEmployeeProfileColumns();
+  const name = String(payload.name || '').trim();
+  if (!name) throw new Error('กรุณาระบุชื่อ-นามสกุลพนักงานครับ');
+
+  const rows = repoReadAll(SHEETS.EMPLOYEES).rows;
+  const isEdit = !!payload.isEdit;
+  const target = isEdit ? rows.find(r => String(r.employee_id) === String(payload.original_employee_id || payload.employee_id)) : null;
+
+  let empId = String(payload.employee_id || '').trim();
+  if (!isEdit && !empId) {
+    const maxId = rows.reduce((m, r) => Math.max(m, Number(r.employee_id) || 0), 0);
+    empId = String(maxId + 1);
+  }
+  if (!isEdit && rows.some(r => String(r.employee_id) === empId)) {
+    throw new Error('รหัส employee_id ' + empId + ' ซ้ำกับที่มีอยู่แล้วครับ');
+  }
+
+  const fpId = String(payload.fingerprint_id || '').trim();
+  if (fpId && rows.some(r => String(r.fingerprint_id) === fpId && (!target || r._rowIndex !== target._rowIndex))) {
+    throw new Error('รหัสสแกนนิ้ว (fingerprint_id) ' + fpId + ' ซ้ำกับพนักงานคนอื่นครับ');
+  }
+
+  const rec = {
+    employee_id: empId,
+    code: String(payload.code || '').trim(),
+    title: String(payload.title || '').trim(),
+    name: name,
+    nickname: String(payload.nickname || '').trim(),
+    department: String(payload.department || '').trim(),
+    position: String(payload.position || '').trim(),
+    fingerprint_id: fpId,
+    line_user_id: String(payload.line_user_id || '').trim(),
+    role: String(payload.role || 'employee').trim().toLowerCase(),
+    supervisor_id: String(payload.supervisor_id || '').trim(),
+    status: String(payload.status || 'ACTIVE').trim().toUpperCase(),
+    hire_date: repoNormalizeDate(payload.hire_date || ''),
+    vacation_quota: String(payload.vacation_quota !== undefined && payload.vacation_quota !== '' ? payload.vacation_quota : '6').trim(),
+    national_id: String(payload.national_id || '').trim(),
+    email: String(payload.email || '').trim(),
+    phone: String(payload.phone || '').trim(),
+    address: String(payload.address || '').trim(),
+    bank_name: String(payload.bank_name || '').trim(),
+    bank_account: String(payload.bank_account || '').trim(),
+    pvd_join_date: repoNormalizeDate(payload.pvd_join_date || '')
+  };
+
+  if (target) {
+    repoUpdateRow(SHEETS.EMPLOYEES, target._rowIndex, rec);
+    repoAppendAuditLog(actor || 'admin', 'UPDATE_EMPLOYEE', SHEETS.EMPLOYEES, empId,
+      { name: target.name, status: target.status, role: target.role },
+      { name: rec.name, status: rec.status, role: rec.role, pvd_join_date: rec.pvd_join_date }, 'แก้ไขทะเบียนพนักงานจาก Dashboard');
+  } else {
+    repoAppendRow(SHEETS.EMPLOYEES, rec);
+    repoAppendAuditLog(actor || 'admin', 'ADD_EMPLOYEE', SHEETS.EMPLOYEES, empId, null,
+      { name: rec.name, code: rec.code, department: rec.department }, 'เพิ่มพนักงานใหม่จาก Dashboard');
+  }
+  repoClearCache();
+
+  // ซิงก์ชื่อธนาคารและเลขบัญชีเข้า Calculation หากมีแถวพนักงานคนนี้อยู่แล้ว
+  try {
+    const cfg = getAppConfig();
+    if (cfg.PAYROLL_SHEET_ID && rec.code) {
+      const calcSheet = getPayrollDb().getSheetByName('Calculation');
+      if (calcSheet && calcSheet.getLastRow() >= 2 && String(calcSheet.getRange(1, 7).getValue()).indexOf('วันมาทำงาน') !== -1) {
+        const codes = calcSheet.getRange(2, 1, calcSheet.getLastRow() - 1, 1).getValues();
+        const k = normEmpCode(rec.code);
+        for (let i = 0; i < codes.length; i++) {
+          if (normEmpCode(codes[i][0]) === k) {
+            const rIdx = i + 2;
+            calcSheet.getRange(rIdx, 2, 1, 4).setValues([[rec.name, rec.nickname, rec.position, rec.hire_date]]);
+            if (rec.bank_name || rec.bank_account) {
+              calcSheet.getRange(rIdx, 32, 1, 2).setNumberFormat('@').setValues([[rec.bank_name, rec.bank_account]]);
+            }
+            break;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log('syncEmpToCalculation skip: ' + e.message);
+  }
+
+  return { ok: true, employees: listAllEmployeesAdmin() };
 }

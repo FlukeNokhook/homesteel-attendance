@@ -334,3 +334,15 @@ function adminSavePvdRates(adminSecret, updatesList) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => savePvdRates(updatesList, 'ADMIN'));
 }
+
+/* ================= Employee Directory Management (Admin Only / PDPA) ================= */
+
+function adminGetAllEmployees(adminSecret) {
+  verifyAdminSecret(adminSecret);
+  return listAllEmployeesAdmin();
+}
+
+function adminSaveEmployee(adminSecret, payload) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => saveEmployeeAdmin(payload, 'ADMIN'));
+}

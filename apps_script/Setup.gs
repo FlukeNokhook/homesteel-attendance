@@ -7,7 +7,8 @@
 const DB_SCHEMA = {
   Employees: [
     'employee_id', 'code', 'name', 'nickname', 'department', 'position',
-    'fingerprint_id', 'line_user_id', 'role', 'supervisor_id', 'status', 'hire_date', 'vacation_quota'
+    'fingerprint_id', 'line_user_id', 'role', 'supervisor_id', 'status', 'hire_date', 'vacation_quota',
+    'title', 'national_id', 'email', 'phone', 'address', 'bank_name', 'bank_account', 'pvd_join_date'
   ],
   Attendance_Daily: [
     'work_date', 'employee_id', 'code', 'name', 'first_in', 'last_out',
@@ -176,4 +177,25 @@ function ensureBonusSheets() {
       sheet.autoResizeColumns(1, headers.length);
     }
   });
+}
+
+/**
+ * เพิ่มคอลัมน์ข้อมูลทะเบียนพนักงาน & กองทุนฯ (N-U) ต่อท้ายแท็บ Employees อัตโนมัติหากยังไม่มี
+ */
+function ensureEmployeeProfileColumns() {
+  const sheet = repoGetMainDb().getSheetByName(SHEETS.EMPLOYEES);
+  if (!sheet || sheet.getLastRow() < 1) return;
+  const lastCol = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+  const missing = DB_SCHEMA.Employees.filter(col => headers.indexOf(col) === -1);
+  if (!missing.length) return;
+
+  const startCol = lastCol + 1;
+  if (startCol + missing.length - 1 > sheet.getMaxColumns()) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), startCol + missing.length - 1 - sheet.getMaxColumns());
+  }
+  sheet.getRange(1, startCol, 1, missing.length).setValues([missing])
+    .setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
+  sheet.getRange(2, startCol, Math.max(1, sheet.getMaxRows() - 1), missing.length).setNumberFormat('@');
+  repoClearCache();
 }
