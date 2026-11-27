@@ -626,7 +626,13 @@
             <div class="card-head">
               <div>
                 <h3 class="card-title">🏦 กองทุนสำรองเลี้ยงชีพ (PVD)</h3>
-                <div class="card-sub">ปรับอัตรา % สะสมของพนักงานแต่ละคน • คำนวณยอดหักจากฐานเงินเดือนอัตโนมัติ (คอลัมน์ U–V ใน Calculation)</div>
+                <div class="rate-bar">
+                  <span>เงื่อนไข:</span>
+                  <span class="rate-pill">อายุงานครบ 1 ปีขึ้นไป</span>
+                  <span class="rate-pill">พนักงานสะสม 1–15%</span>
+                  <span class="rate-pill">บริษัทสมทบสูงสุด 2% (อายุงาน 1–2 ปี)</span>
+                  <span class="rate-pill">บริษัทสมทบสูงสุด 3% (อายุงาน 3 ปี+)</span>
+                </div>
               </div>
               <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <button class="btn btn-ghost btn-sm" onclick="loadPvdTab(true)">🔄 โหลดข้อมูล</button>
@@ -2676,20 +2682,54 @@
     /* ================= Provident Fund (PVD) ================= */
     let PVD_ROWS = [];
 
+    function calcTenureInfo(hireIso, ym) {
+      if (!hireIso || !/^\d{4}-\d{2}-\d{2}$/.test(hireIso)) {
+        return { known: false, years: 0, months: 0, eligible: true, coCapPct: 2, label: 'ไม่ระบุวันเริ่มงาน' };
+      }
+      const [y, m] = (ym || ymNow()).split('-').map(Number);
+      const refDate = new Date(y, m, 0); // วันสิ้นเดือนของงวดที่เลือก
+      const h = new Date(hireIso + 'T00:00:00');
+      let totalMonths = (refDate.getFullYear() - h.getFullYear()) * 12 + (refDate.getMonth() - h.getMonth());
+      if (refDate.getDate() < h.getDate()) totalMonths--;
+      if (totalMonths < 0) totalMonths = 0;
+      const yrs = Math.floor(totalMonths / 12);
+      const remM = totalMonths % 12;
+      const eligible = yrs >= 1;
+      const coCapPct = !eligible ? 0 : (yrs >= 3 ? 3 : 2);
+      const label = yrs > 0 ? `${yrs} ปี${remM > 0 ? ' ' + remM + ' ด.' : ''}` : `${remM} เดือน`;
+      return { known: true, years: yrs, months: remM, eligible: eligible, coCapPct: coCapPct, label: label };
+    }
+
+    function calcPvdAmounts(r) {
+      const empPct = r.eligible ? (Number(r.pvd_pct) || 0) : 0;
+      const coPct = r.eligible ? Math.min(empPct, r.coCapPct) : 0;
+      const empAmt = Math.round(r.base_salary * (empPct / 100) * 100) / 100;
+      const coAmt = Math.round(r.base_salary * (coPct / 100) * 100) / 100;
+      return { empPct, coPct, empAmt, coAmt, totalAmt: Math.round((empAmt + coAmt) * 100) / 100 };
+    }
+
     async function loadPvdTab(forceReload) {
       try {
         if (forceReload || !PAYROLL_CACHE.employees || !PAYROLL_CACHE.employees.length) {
           const res = await call('adminGetPayrollData');
           PAYROLL_CACHE = res;
         }
-        PVD_ROWS = (PAYROLL_CACHE.employees || []).map(e => ({
-          rowIndex: e.rowIndex,
-          code: e.code,
-          name: e.name,
-          nickname: e.nickname,
-          base_salary: Number(e.base_salary) || 0,
-          pvd_pct: Math.round((Number(e.pvd_rate) || 0) * 1000) / 10 // เช่น 0.03 -> 3
-        }));
+        const ym = $('monthPicker').value;
+        PVD_ROWS = (PAYROLL_CACHE.employees || []).map(e => {
+          const t = calcTenureInfo(e.hire_date_iso, ym);
+          const rawPct = Math.round((Number(e.pvd_rate) || 0) * 1000) / 10;
+          return {
+            rowIndex: e.rowIndex,
+            code: e.code,
+            name: e.name,
+            nickname: e.nickname,
+            base_salary: Number(e.base_salary) || 0,
+            tenureLabel: t.label,
+            eligible: t.eligible,
+            coCapPct: t.coCapPct,
+            pvd_pct: t.eligible ? rawPct : 0
+          };
+        });
         renderPvdTab();
       } catch (err) { toast(err.message, 'error'); }
     }
@@ -2704,25 +2744,30 @@
         <thead>
           <tr>
             <th style="width:36px;">#</th>
-            <th>รหัส</th>
             <th>ชื่อ-สกุล (ชื่อเล่น)</th>
-            <th class="num">ฐานเงินเดือน (บ.)</th>
-            <th style="width:230px;">อัตรา % กองทุนสำรองฯ</th>
-            <th class="num">หักพนักงาน/เดือน</th>
-            <th class="num">สมทบบริษัท/เดือน</th>
-            <th class="num">นำส่งรวม/เดือน</th>
+            <th>อายุงาน / เพดานบริษัท</th>
+            <th class="num">ฐานเงินเดือน</th>
+            <th style="width:230px;">พนักงานสะสม (1–15%)</th>
+            <th class="num">หักพนักงาน</th>
+            <th class="num">สมทบบริษัท</th>
+            <th class="num">นำส่งรวม</th>
           </tr>
         </thead>
         <tbody>${PVD_ROWS.map((r, i) => {
-          const amt = Math.round(r.base_salary * (r.pvd_pct / 100) * 100) / 100;
-          return `<tr>
+          const c = calcPvdAmounts(r);
+          const capBadge = !r.eligible
+            ? `<span class="pill pill-amber">⏳ ${esc(r.tenureLabel)} (ยังไม่ครบ 1 ปี)</span>`
+            : (r.coCapPct >= 3
+              ? `<span class="pill pill-green">${esc(r.tenureLabel)} • สูงสุด 3%</span>`
+              : `<span class="pill pill-blue">${esc(r.tenureLabel)} • สูงสุด 2%</span>`);
+          return `<tr style="${r.eligible ? '' : 'opacity:.6; background:#f8fafc;'}">
             <td>${i + 1}</td>
-            <td class="mono">${esc(r.code)}</td>
-            <td><b>${esc(r.name)}</b>${r.nickname && r.nickname !== r.name ? ` <span class="card-sub">(${esc(r.nickname)})</span>` : ''}</td>
+            <td><b>${esc(r.name)}</b>${r.nickname && r.nickname !== r.name ? ` <span class="card-sub">(${esc(r.nickname)})</span>` : ''}<div class="card-sub mono">${esc(r.code)}</div></td>
+            <td>${capBadge}</td>
             <td class="num">${fmtBaht(r.base_salary)}</td>
             <td>
-              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <input id="pvdPct_${i}" type="number" step="0.5" min="0" max="15" value="${r.pvd_pct}" style="width:66px; padding:5px 7px; border:1px solid var(--border); border-radius:7px; text-align:right; font-weight:600;" oninput="onPvdInput(${i}, this.value)" />
+              ${r.eligible ? `<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <input id="pvdPct_${i}" type="number" step="0.5" min="0" max="15" value="${r.pvd_pct}" style="width:64px; padding:5px 7px; border:1px solid var(--border); border-radius:7px; text-align:right; font-weight:600;" oninput="onPvdInput(${i}, this.value)" />
                 <span class="card-sub">%</span>
                 <div class="pay-quick-btns" style="margin-top:0;">
                   <button type="button" class="pay-quick-btn" onclick="setPvdPct(${i},0)">0%</button>
@@ -2730,11 +2775,11 @@
                   <button type="button" class="pay-quick-btn" onclick="setPvdPct(${i},3)">3%</button>
                   <button type="button" class="pay-quick-btn" onclick="setPvdPct(${i},5)">5%</button>
                 </div>
-              </div>
+              </div>` : '<span class="card-sub">ยังไม่มีสิทธิ์เข้ากองทุน</span>'}
             </td>
-            <td id="pvdEmp_${i}" class="num" style="color:${amt > 0 ? 'var(--red)' : 'var(--muted)'}; font-weight:600;">${amt > 0 ? '-' + fmtBaht(amt) : '0.00'}</td>
-            <td id="pvdCo_${i}" class="num" style="color:${amt > 0 ? '#1d4ed8' : 'var(--muted)'}; font-weight:600;">${fmtBaht(amt)}</td>
-            <td id="pvdTot_${i}" class="num" style="font-weight:700;">${fmtBaht(amt * 2)}</td>
+            <td id="pvdEmp_${i}" class="num" style="color:${c.empAmt > 0 ? 'var(--red)' : 'var(--muted)'}; font-weight:600;">${c.empAmt > 0 ? '-' + fmtBaht(c.empAmt) : '0.00'}</td>
+            <td id="pvdCo_${i}" class="num" style="color:${c.coAmt > 0 ? '#1d4ed8' : 'var(--muted)'}; font-weight:600;">${fmtBaht(c.coAmt)}${c.coPct > 0 ? `<div class="card-sub">(${c.coPct}%)</div>` : ''}</td>
+            <td id="pvdTot_${i}" class="num" style="font-weight:700;">${fmtBaht(c.totalAmt)}</td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`;
@@ -2742,37 +2787,50 @@
     }
 
     function setPvdPct(i, pct) {
+      if (!PVD_ROWS[i] || !PVD_ROWS[i].eligible) return;
       const el = $('pvdPct_' + i);
       if (el) el.value = pct;
       onPvdInput(i, pct);
     }
 
     function onPvdInput(i, val) {
+      if (!PVD_ROWS[i] || !PVD_ROWS[i].eligible) return;
       const pct = Math.max(0, Math.min(15, Number(val) || 0));
       PVD_ROWS[i].pvd_pct = pct;
-      const amt = Math.round(PVD_ROWS[i].base_salary * (pct / 100) * 100) / 100;
+      const c = calcPvdAmounts(PVD_ROWS[i]);
       const eEl = $('pvdEmp_' + i), cEl = $('pvdCo_' + i), tEl = $('pvdTot_' + i);
-      if (eEl) { eEl.textContent = amt > 0 ? '-' + fmtBaht(amt) : '0.00'; eEl.style.color = amt > 0 ? 'var(--red)' : 'var(--muted)'; }
-      if (cEl) { cEl.textContent = fmtBaht(amt); cEl.style.color = amt > 0 ? '#1d4ed8' : 'var(--muted)'; }
-      if (tEl) tEl.textContent = fmtBaht(amt * 2);
+      if (eEl) { eEl.textContent = c.empAmt > 0 ? '-' + fmtBaht(c.empAmt) : '0.00'; eEl.style.color = c.empAmt > 0 ? 'var(--red)' : 'var(--muted)'; }
+      if (cEl) { cEl.innerHTML = fmtBaht(c.coAmt) + (c.coPct > 0 ? `<div class="card-sub">(${c.coPct}%)</div>` : ''); cEl.style.color = c.coAmt > 0 ? '#1d4ed8' : 'var(--muted)'; }
+      if (tEl) tEl.textContent = fmtBaht(c.totalAmt);
       updatePvdStatsOnly();
     }
 
     function updatePvdStatsOnly() {
-      const members = PVD_ROWS.filter(r => r.pvd_pct > 0).length;
-      const empSum = PVD_ROWS.reduce((s, r) => s + Math.round(r.base_salary * (r.pvd_pct / 100) * 100) / 100, 0);
+      const members = PVD_ROWS.filter(r => r.eligible && r.pvd_pct > 0).length;
+      const eligibleCnt = PVD_ROWS.filter(r => r.eligible).length;
+      let empSum = 0, coSum = 0;
+      PVD_ROWS.forEach(r => {
+        const c = calcPvdAmounts(r);
+        empSum += c.empAmt;
+        coSum += c.coAmt;
+      });
       $('pvdStats').innerHTML = [
-        statCard('👥', 'var(--brand-soft)', 'สมาชิกกองทุนฯ', `${members}/${PVD_ROWS.length}`, 'คน'),
+        statCard('👥', 'var(--brand-soft)', 'สมาชิกกองทุนฯ', `${members}/${eligibleCnt}`, 'คนที่มีสิทธิ์'),
         statCard('👤', 'var(--red-soft)', 'สะสมพนักงานรวม', fmtBaht(empSum), 'บาท/เดือน'),
-        statCard('🏢', 'var(--amber-soft)', 'สมทบบริษัทรวม', fmtBaht(empSum), 'บาท/เดือน'),
-        statCard('🏦', 'var(--green-soft)', 'ยอดนำส่งกองทุนรวม', fmtBaht(empSum * 2), 'บาท/เดือน')
+        statCard('🏢', 'var(--amber-soft)', 'สมทบบริษัทรวม', fmtBaht(coSum), 'บาท/เดือน'),
+        statCard('🏦', 'var(--green-soft)', 'ยอดนำส่งกองทุนรวม', fmtBaht(empSum + coSum), 'บาท/เดือน')
       ].join('');
     }
 
     async function savePvdTab() {
       if (!PVD_ROWS.length) return;
+      const invalid = PVD_ROWS.find(r => r.eligible && r.pvd_pct > 0 && (r.pvd_pct < 1 || r.pvd_pct > 15));
+      if (invalid) {
+        toast(`อัตรา PVD ของ ${invalid.nickname || invalid.name} ต้องอยู่ระหว่าง 1%–15% (หรือ 0% ถ้ายังไม่เข้ากองทุน) ครับ`, 'error');
+        return;
+      }
       try {
-        const res = await call('adminSavePvdRates', PVD_ROWS.map(r => ({ rowIndex: r.rowIndex, pvd_pct: r.pvd_pct })));
+        const res = await call('adminSavePvdRates', PVD_ROWS.map(r => ({ rowIndex: r.rowIndex, pvd_pct: r.eligible ? r.pvd_pct : 0 })));
         if (res.payroll) PAYROLL_CACHE = res.payroll;
         toast(res.updatedCount ? `บันทึกอัตรา PVD (${res.updatedCount} คน) ลง Calculation เรียบร้อย` : 'ไม่มีอัตรา PVD ที่เปลี่ยนแปลงครับ', 'success');
         loadPvdTab(false);

@@ -324,7 +324,8 @@ function getPayrollDashboardData() {
     if (isCleanLayout) {
       employees.push({
         rowIndex: r + 1,
-        code: code, name: name, nickname: nickname, position: String(row[3] || ''), hire_date: dateFmt(row[4]),
+        code: code, name: name, nickname: nickname, position: String(row[3] || ''),
+        hire_date: dateFmt(row[4]), hire_date_iso: repoNormalizeDate(row[4]),
         base_salary: numVal(row[5]),
         work_days: numVal(row[6]), work_hours: numVal(row[7]), ot15_hours: numVal(row[8]), late_min: numVal(row[9]), absent_hours: numVal(row[10]),
         ot_baht: numVal(row[11]), commission: numVal(row[12]), measurement: numVal(row[13]), frame_bonus: numVal(row[14]),
@@ -338,7 +339,8 @@ function getPayrollDashboardData() {
     } else {
       employees.push({
         rowIndex: r + 1,
-        code: code, name: name, nickname: nickname, position: String(row[3] || ''), hire_date: dateFmt(row[4]),
+        code: code, name: name, nickname: nickname, position: String(row[3] || ''),
+        hire_date: dateFmt(row[4]), hire_date_iso: repoNormalizeDate(row[4]),
         base_salary: numVal(row[5]),
         work_hours: numVal(row[37]), ot15_hours: numVal(row[38]),
         ot_baht: numVal(row[41]), commission: numVal(row[42]), measurement: numVal(row[43]), frame_bonus: numVal(row[44]),
