@@ -686,19 +686,14 @@
         <!-- Settings Sub-tab 1: Employee Directory -->
         <div id="ssub-employees">
           <div class="card">
-            <div class="card-head">
+            <div class="pay-toolbar">
               <div>
-                <h3 class="card-title">👥 ทะเบียนพนักงาน (จัดการได้ครบทุกช่อง A–U)</h3>
-                <div class="card-sub">ข้อมูลส่วนตัว (บัตร ปชช. / ที่อยู่ / บัญชีธนาคาร) เก็บเป็นความลับเฉพาะผู้ดูแลระบบ (PDPA)</div>
+                <h3 class="card-title" style="margin:0;">👥 ทะเบียนพนักงาน</h3>
+                <div class="card-sub">คลิกชื่อพนักงานฝั่งซ้ายเพื่อดูและแก้ไขข้อมูลได้ทันทีฝั่งขวา (ข้อมูลส่วนตัวเก็บเฉพาะผู้ดูแลระบบ)</div>
               </div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <input id="empDirSearch" class="input" style="width:200px; padding:7px 10px; font-size:13px;" placeholder="🔍 ค้นหาชื่อ / รหัส / แผนก..." oninput="renderEmpDirectory()" />
-                <select id="empDirStatus" class="select" style="width:auto; padding:7px 10px; font-size:13px;" onchange="renderEmpDirectory()">
-                  <option value="ACTIVE">เฉพาะ ACTIVE</option>
-                  <option value="ALL">ทั้งหมด</option>
-                  <option value="INACTIVE">เฉพาะ INACTIVE</option>
-                </select>
-                <button class="btn btn-primary btn-sm" onclick="openEmpFormModal(null)">➕ เพิ่มพนักงานใหม่</button>
+              <div class="pay-toolbar-group">
+                <button class="btn btn-ghost btn-sm" onclick="loadEmpDirectory()">🔄 รีเฟรช</button>
+                <button class="btn btn-primary btn-sm" onclick="startAddNewEmployee()">➕ เพิ่มพนักงานใหม่</button>
               </div>
             </div>
             <div id="empDirTable"></div>
@@ -2922,6 +2917,10 @@
 
     /* ================= Settings: Employee Directory (Admin Only / PDPA) ================= */
     let EMP_DIR_CACHE = [];
+    let EMP_DIR_SELECTED_ID = '';
+    let EMP_DIR_NEW_MODE = false;
+    let EMP_DIR_SEARCH = '';
+    let EMP_DIR_STATUS = 'ACTIVE';
 
     function switchSettingsSub(sub) {
       document.querySelectorAll('.subtab-btn[data-ssub]').forEach(b => b.classList.toggle('active', b.dataset.ssub === sub));
@@ -2933,113 +2932,172 @@
     async function loadEmpDirectory() {
       try {
         EMP_DIR_CACHE = await call('adminGetAllEmployees') || [];
+        if (!EMP_DIR_NEW_MODE && (!EMP_DIR_SELECTED_ID || !EMP_DIR_CACHE.some(e => String(e.employee_id) === String(EMP_DIR_SELECTED_ID)))) {
+          const first = EMP_DIR_CACHE.find(e => String(e.status).toUpperCase() === 'ACTIVE') || EMP_DIR_CACHE[0];
+          EMP_DIR_SELECTED_ID = first ? String(first.employee_id) : '';
+        }
         renderEmpDirectory();
       } catch (err) { toast(err.message, 'error'); }
     }
 
-    function renderEmpDirectory() {
-      const q = ($('empDirSearch') ? $('empDirSearch').value : '').trim().toLowerCase();
-      const st = $('empDirStatus') ? $('empDirStatus').value : 'ACTIVE';
-      const list = EMP_DIR_CACHE.filter(e => {
-        if (st !== 'ALL' && String(e.status).toUpperCase() !== st) return false;
+    function getFilteredEmpDir() {
+      const q = EMP_DIR_SEARCH.trim().toLowerCase();
+      return EMP_DIR_CACHE.filter(e => {
+        if (EMP_DIR_STATUS !== 'ALL' && String(e.status).toUpperCase() !== EMP_DIR_STATUS) return false;
         if (!q) return true;
         return (`${e.employee_id} ${e.code} ${e.name} ${e.nickname} ${e.department} ${e.position} ${e.fingerprint_id}`).toLowerCase().includes(q);
       });
-      if (!list.length) {
-        $('empDirTable').innerHTML = emptyState('👥', 'ไม่พบข้อมูลพนักงานตามเงื่อนไขที่ค้นหา');
-        return;
-      }
-      $('empDirTable').innerHTML = `<div class="table-wrap"><table>
-        <thead>
-          <tr>
-            <th>รหัส</th>
-            <th>ชื่อ-สกุล (ชื่อเล่น)</th>
-            <th>แผนก / ตำแหน่ง</th>
-            <th>รหัสนิ้ว</th>
-            <th>เริ่มงาน / กองทุนฯ</th>
-            <th>พักร้อน</th>
-            <th>ธนาคาร / บัตร ปชช.</th>
-            <th>สถานะ</th>
-            <th style="text-align:right;">จัดการ</th>
-          </tr>
-        </thead>
-        <tbody>${list.map(e => `<tr>
-          <td><div class="mono" style="font-weight:600;">${esc(e.code || '-')}</div><div class="card-sub">ID #${esc(e.employee_id)}</div></td>
-          <td><b>${esc(e.title ? e.title + ' ' : '')}${esc(e.name)}</b>${e.nickname && e.nickname !== e.name ? ` <span class="card-sub">(${esc(e.nickname)})</span>` : ''}<div class="card-sub">${esc(e.email || e.phone || '')}</div></td>
-          <td><div>${esc(e.department || '-')}</div><div class="card-sub">${esc(e.position || '')}</div></td>
-          <td class="mono">${esc(e.fingerprint_id || '-')}</td>
-          <td style="font-size:12px;"><div>งาน: ${esc(fmtThaiDmy(e.hire_date))}</div>${e.pvd_join_date ? `<div style="color:#15803d;">PVD: ${esc(fmtThaiDmy(e.pvd_join_date))}</div>` : '<div class="card-sub">PVD: -</div>'}</td>
-          <td class="mono">${esc(e.vacation_quota || '6')} วัน</td>
-          <td style="font-size:12px;"><div>${esc(e.bank_name ? e.bank_name + ' ' + e.bank_account : (e.bank_account || '-'))}</div><div class="card-sub mono">${esc(e.national_id || '')}</div></td>
-          <td><span class="pill ${String(e.status).toUpperCase() === 'ACTIVE' ? 'pill-green' : 'pill-gray'}">${esc(e.status)}</span></td>
-          <td style="text-align:right; white-space:nowrap;">
-            <button class="btn btn-soft-blue btn-sm" onclick="openEmpFormModal('${esc(e.employee_id)}')">✏️ แก้ไข</button>
-          </td>
-        </tr>`).join('')}</tbody>
-      </table></div>`;
     }
 
-    function openEmpFormModal(empId) {
-      const isEdit = empId !== null && empId !== undefined && empId !== '';
-      const e = isEdit ? EMP_DIR_CACHE.find(x => String(x.employee_id) === String(empId)) : {
+    function renderEmpDirectory() {
+      if (!EMP_DIR_CACHE.length && !EMP_DIR_NEW_MODE) {
+        $('empDirTable').innerHTML = emptyState('👥', 'ยังไม่มีข้อมูลพนักงาน — กด "เพิ่มพนักงานใหม่" ด้านบนได้เลยครับ');
+        return;
+      }
+      $('empDirTable').innerHTML = `
+        <div class="pay-split">
+          <div class="pay-list-pane">
+            <div class="pay-list-search" style="display:grid; gap:6px;">
+              <input class="input" style="padding:7px 10px; font-size:13px;" placeholder="🔍 ค้นหาชื่อ / รหัส / แผนก..." value="${esc(EMP_DIR_SEARCH)}" oninput="EMP_DIR_SEARCH=this.value; renderEmpDirList()" />
+              <select class="select" style="padding:6px 10px; font-size:12.5px;" onchange="EMP_DIR_STATUS=this.value; renderEmpDirList()">
+                <option value="ACTIVE" ${EMP_DIR_STATUS==='ACTIVE'?'selected':''}>เฉพาะพนักงาน ACTIVE</option>
+                <option value="ALL" ${EMP_DIR_STATUS==='ALL'?'selected':''}>ทั้งหมด (ACTIVE + INACTIVE)</option>
+                <option value="INACTIVE" ${EMP_DIR_STATUS==='INACTIVE'?'selected':''}>เฉพาะ INACTIVE</option>
+              </select>
+            </div>
+            <div id="empDirListScroll" class="pay-list-scroll"></div>
+          </div>
+          <div id="empDirDetailPane" class="pay-detail-pane"></div>
+        </div>`;
+      renderEmpDirList();
+      renderEmpDirDetail();
+    }
+
+    function renderEmpDirList() {
+      const list = getFilteredEmpDir();
+      const wrap = $('empDirListScroll');
+      if (!wrap) return;
+      if (!list.length) {
+        wrap.innerHTML = emptyState('🔍', 'ไม่พบพนักงานตามเงื่อนไข');
+        return;
+      }
+      wrap.innerHTML = list.map((e, i) => {
+        const isActive = !EMP_DIR_NEW_MODE && String(e.employee_id) === String(EMP_DIR_SELECTED_ID);
+        const isEmpActive = String(e.status).toUpperCase() === 'ACTIVE';
+        return `<div class="pay-item ${isActive ? 'active' : ''}" onclick="selectEmpDir('${esc(e.employee_id)}')">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+            <div class="pay-item-name">${i + 1}. ${esc(e.name)}${e.nickname && e.nickname !== e.name ? ` <span class="card-sub">(${esc(e.nickname)})</span>` : ''}</div>
+            <span style="width:8px; height:8px; border-radius:50%; background:${isEmpActive ? '#16a34a' : '#94a3b8'}; flex-shrink:0;" title="${esc(e.status)}"></span>
+          </div>
+          <div class="pay-item-breakdown">
+            <div class="pay-item-b-row"><span>${esc(e.code || 'ID #' + e.employee_id)}</span><span>${esc(e.department || '-')}</span></div>
+            <div class="pay-item-b-row">
+              <span>นิ้ว #${esc(e.fingerprint_id || '-')} • พักร้อน ${esc(e.vacation_quota || '6')} วัน</span>
+              ${e.pvd_join_date ? '<span class="b-plus">PVD</span>' : '<span></span>'}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function selectEmpDir(empId) {
+      EMP_DIR_NEW_MODE = false;
+      EMP_DIR_SELECTED_ID = String(empId);
+      renderEmpDirList();
+      renderEmpDirDetail();
+    }
+
+    function startAddNewEmployee() {
+      EMP_DIR_NEW_MODE = true;
+      renderEmpDirectory();
+    }
+
+    function renderEmpDirDetail() {
+      const pane = $('empDirDetailPane');
+      if (!pane) return;
+      const list = getFilteredEmpDir();
+      const curIdx = list.findIndex(x => String(x.employee_id) === String(EMP_DIR_SELECTED_ID));
+      const isEdit = !EMP_DIR_NEW_MODE;
+      const e = isEdit ? EMP_DIR_CACHE.find(x => String(x.employee_id) === String(EMP_DIR_SELECTED_ID)) : {
         employee_id: '', code: '', title: '', name: '', nickname: '', department: '', position: '',
         fingerprint_id: '', line_user_id: '', role: 'employee', supervisor_id: '', status: 'ACTIVE',
         hire_date: '', vacation_quota: '6', national_id: '', email: '', phone: '', address: '',
         bank_name: '', bank_account: '', pvd_join_date: ''
       };
-      if (!e) return;
+      if (!e) {
+        pane.innerHTML = emptyState('👤', 'เลือกพนักงานจากรายการฝั่งซ้ายเพื่อดูและแก้ไขข้อมูล');
+        return;
+      }
 
-      const root = $('modalRoot');
-      root.innerHTML = `<div class="modal-bg"><div class="modal wide">
-        <h3>${isEdit ? '✏️ แก้ไขทะเบียนพนักงาน • ' + esc(e.name) : '➕ เพิ่มพนักงานใหม่'}</h3>
-        <div style="display:grid; gap:14px; margin-top:10px;">
-          <div style="padding:12px; background:#f8fafc; border:1px solid var(--border); border-radius:10px;">
-            <div style="font-weight:700; font-size:13.5px; margin-bottom:8px; color:#1e3a8a;">1. ข้อมูลงานและระบบ (คอลัมน์ A–M)</div>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px;">
-              <div><label class="card-sub">Employee ID ${isEdit ? '(ห้ามเปลี่ยน)' : '(ว่าง = สร้างอัตโนมัติ)'}</label><input id="efId" class="input" value="${esc(e.employee_id)}" ${isEdit ? 'disabled' : ''} /></div>
+      const navHtml = isEdit ? `
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button class="btn btn-ghost btn-sm" ${curIdx <= 0 ? 'disabled' : ''} onclick="selectEmpDir('${curIdx > 0 ? esc(list[curIdx - 1].employee_id) : ''}')">‹ ก่อนหน้า</button>
+          <span class="card-sub">${curIdx >= 0 ? (curIdx + 1) + '/' + list.length : ''}</span>
+          <button class="btn btn-ghost btn-sm" ${curIdx < 0 || curIdx >= list.length - 1 ? 'disabled' : ''} onclick="selectEmpDir('${curIdx >= 0 && curIdx < list.length - 1 ? esc(list[curIdx + 1].employee_id) : ''}')">ถัดไป ›</button>
+        </div>` : `<button class="btn btn-ghost btn-sm" onclick="EMP_DIR_NEW_MODE=false; renderEmpDirectory()">ยกเลิกการเพิ่มใหม่</button>`;
+
+      pane.innerHTML = `
+        <div class="pay-detail-head">
+          <div>
+            <div style="font-weight:700; font-size:17px;">${isEdit ? esc((e.title ? e.title + ' ' : '') + e.name) + (e.nickname && e.nickname !== e.name ? ` (${esc(e.nickname)})` : '') : '➕ เพิ่มพนักงานใหม่'}</div>
+            <div class="card-sub">${isEdit ? `รหัส ${esc(e.code || '-')} • ID #${esc(e.employee_id)}${e.department ? ' • ' + esc(e.department) : ''}` : 'กรอกข้อมูลพนักงานใหม่แล้วกดบันทึก'}</div>
+          </div>
+          ${navHtml}
+        </div>
+
+        <div style="display:grid; gap:14px;">
+          <div style="padding:14px; background:#f8fafc; border:1px solid var(--border); border-radius:10px;">
+            <div style="font-weight:700; font-size:13.5px; margin-bottom:10px; color:#1e3a8a;">1. ข้อมูลงานและระบบ</div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px;">
               <div><label class="card-sub">รหัสพนักงาน (code)</label><input id="efCode" class="input" value="${esc(e.code)}" placeholder="เช่น 0102030" /></div>
               <div><label class="card-sub">คำนำหน้าชื่อ</label><select id="efTitle" class="select"><option value="">-</option><option value="นาย" ${e.title==='นาย'?'selected':''}>นาย</option><option value="นาง" ${e.title==='นาง'?'selected':''}>นาง</option><option value="นางสาว" ${e.title==='นางสาว'?'selected':''}>นางสาว</option></select></div>
               <div style="grid-column:span 2;"><label class="card-sub">ชื่อ-นามสกุล *</label><input id="efName" class="input" value="${esc(e.name)}" placeholder="ชื่อ นามสกุล" /></div>
               <div><label class="card-sub">ชื่อเล่น</label><input id="efNick" class="input" value="${esc(e.nickname)}" /></div>
-              <div><label class="card-sub">แผนก (department)</label><input id="efDept" class="input" value="${esc(e.department)}" placeholder="พนักงานขาย / ผลิตและจัดส่ง" /></div>
-              <div><label class="card-sub">ตำแหน่ง (position)</label><input id="efPos" class="input" value="${esc(e.position)}" /></div>
-              <div><label class="card-sub">รหัสสแกนนิ้ว (fingerprint_id)</label><input id="efFp" class="input" value="${esc(e.fingerprint_id)}" /></div>
-              <div><label class="card-sub">วันเริ่มงาน (hire_date)</label><input id="efHire" type="date" class="input" value="${esc(e.hire_date)}" /></div>
+              <div><label class="card-sub">แผนก</label><input id="efDept" class="input" value="${esc(e.department)}" placeholder="พนักงานขาย / ผลิตและจัดส่ง" /></div>
+              <div><label class="card-sub">ตำแหน่ง</label><input id="efPos" class="input" value="${esc(e.position)}" /></div>
+              <div><label class="card-sub">รหัสสแกนนิ้ว</label><input id="efFp" class="input" value="${esc(e.fingerprint_id)}" /></div>
+              <div><label class="card-sub">วันเริ่มงาน</label><input id="efHire" type="date" class="input" value="${esc(e.hire_date)}" /></div>
               <div><label class="card-sub">โควตาพักร้อน (วัน/ปี)</label><input id="efVac" type="number" min="0" max="30" class="input" value="${esc(e.vacation_quota || '6')}" /></div>
-              <div><label class="card-sub">สิทธิ์ (role)</label><select id="efRole" class="select"><option value="employee" ${e.role==='employee'?'selected':''}>employee</option><option value="supervisor" ${e.role==='supervisor'?'selected':''}>supervisor</option><option value="admin" ${e.role==='admin'?'selected':''}>admin</option></select></div>
-              <div><label class="card-sub">สถานะ (status)</label><select id="efStatus" class="select"><option value="ACTIVE" ${String(e.status).toUpperCase()==='ACTIVE'?'selected':''}>ACTIVE</option><option value="INACTIVE" ${String(e.status).toUpperCase()==='INACTIVE'?'selected':''}>INACTIVE</option></select></div>
-              <div><label class="card-sub">รหัสหัวหน้า (supervisor_id)</label><input id="efSup" class="input" value="${esc(e.supervisor_id)}" /></div>
+              <div><label class="card-sub">สิทธิ์ในระบบ</label><select id="efRole" class="select"><option value="employee" ${e.role==='employee'?'selected':''}>employee</option><option value="supervisor" ${e.role==='supervisor'?'selected':''}>supervisor</option><option value="admin" ${e.role==='admin'?'selected':''}>admin</option></select></div>
+              <div><label class="card-sub">สถานะ</label><select id="efStatus" class="select"><option value="ACTIVE" ${String(e.status).toUpperCase()==='ACTIVE'?'selected':''}>ACTIVE</option><option value="INACTIVE" ${String(e.status).toUpperCase()==='INACTIVE'?'selected':''}>INACTIVE</option></select></div>
+              <div><label class="card-sub">Employee ID ${isEdit ? '' : '(ว่าง = อัตโนมัติ)'}</label><input id="efId" class="input" value="${esc(e.employee_id)}" ${isEdit ? 'disabled' : ''} /></div>
+              <div><label class="card-sub">รหัสหัวหน้า</label><input id="efSup" class="input" value="${esc(e.supervisor_id)}" /></div>
               <div style="grid-column:span 2;"><label class="card-sub">LINE User ID</label><input id="efLine" class="input mono" value="${esc(e.line_user_id)}" placeholder="U..." /></div>
             </div>
           </div>
 
-          <div style="padding:12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px;">
-            <div style="font-weight:700; font-size:13.5px; margin-bottom:8px; color:#166534;">2. ข้อมูลส่วนตัว บัญชีธนาคาร และกองทุนสำรองฯ (PDPA)</div>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(175px,1fr)); gap:8px;">
+          <div style="padding:14px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px;">
+            <div style="font-weight:700; font-size:13.5px; margin-bottom:10px; color:#166534;">2. ข้อมูลส่วนตัว บัญชีธนาคาร และกองทุนสำรองฯ (PDPA)</div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(175px,1fr)); gap:10px;">
               <div><label class="card-sub">เลขประจำตัวประชาชน</label><input id="efNatId" class="input mono" value="${esc(e.national_id)}" placeholder="1-4099-00000-00-0" /></div>
               <div><label class="card-sub">อีเมล (สำหรับกองทุนฯ)</label><input id="efEmail" type="email" class="input" value="${esc(e.email)}" /></div>
               <div><label class="card-sub">เบอร์โทรศัพท์</label><input id="efPhone" class="input" value="${esc(e.phone)}" /></div>
-              <div><label class="card-sub">ธนาคาร</label><input id="efBank" class="input" value="${esc(e.bank_name)}" placeholder="เช่น กสิกรไทย / SCB / กรุงไทย" /></div>
+              <div><label class="card-sub">ธนาคาร</label><input id="efBank" class="input" value="${esc(e.bank_name)}" placeholder="กสิกรไทย / SCB / กรุงไทย" /></div>
               <div><label class="card-sub">เลขที่บัญชี</label><input id="efBankAcc" class="input mono" value="${esc(e.bank_account)}" /></div>
               <div><label class="card-sub">วันเริ่มเป็นสมาชิกกองทุนฯ (PVD)</label><input id="efPvdJoin" type="date" class="input" value="${esc(e.pvd_join_date)}" /></div>
               <div style="grid-column:1 / -1;"><label class="card-sub">ที่อยู่</label><textarea id="efAddr" class="textarea" rows="2" placeholder="บ้านเลขที่ ตำบล อำเภอ จังหวัด รหัสไปรษณีย์">${esc(e.address)}</textarea></div>
             </div>
           </div>
         </div>
-        <div class="modal-actions">
-          <button class="btn btn-ghost" data-act="cancel">ยกเลิก</button>
-          <button class="btn btn-primary" data-act="ok">💾 บันทึกข้อมูลพนักงาน</button>
-        </div>
-      </div></div>`;
-      const close = () => { root.innerHTML = ''; };
-      root.querySelector('[data-act="cancel"]').onclick = close;
-      root.querySelector('.modal-bg').onclick = ev => { if (ev.target.classList.contains('modal-bg')) close(); };
-      root.querySelector('[data-act="ok"]').onclick = async () => {
-        const nameVal = $('efName').value.trim();
-        if (!nameVal) { toast('กรุณาระบุชื่อ-นามสกุลพนักงานครับ', 'error'); return; }
-        const payload = {
+
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px; flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="saveEmpInline(false)">💾 บันทึกข้อมูล</button>
+          ${isEdit && curIdx >= 0 && curIdx < list.length - 1 ? '<button class="btn btn-success" onclick="saveEmpInline(true)">💾 บันทึก & คนถัดไป ›</button>' : ''}
+        </div>`;
+    }
+
+    async function saveEmpInline(goNext) {
+      const nameVal = $('efName').value.trim();
+      if (!nameVal) { toast('กรุณาระบุชื่อ-นามสกุลพนักงานครับ', 'error'); return; }
+      const isEdit = !EMP_DIR_NEW_MODE;
+      const list = getFilteredEmpDir();
+      const curIdx = list.findIndex(x => String(x.employee_id) === String(EMP_DIR_SELECTED_ID));
+      const nextId = (goNext && curIdx >= 0 && curIdx < list.length - 1) ? String(list[curIdx + 1].employee_id) : '';
+
+      try {
+        const res = await call('adminSaveEmployee', {
           isEdit: isEdit,
-          original_employee_id: e.employee_id,
+          original_employee_id: EMP_DIR_SELECTED_ID,
           employee_id: $('efId').value.trim(),
           code: $('efCode').value.trim(),
           title: $('efTitle').value,
@@ -3061,16 +3119,15 @@
           bank_account: $('efBankAcc').value.trim(),
           pvd_join_date: $('efPvdJoin').value,
           address: $('efAddr').value.trim()
-        };
-        close();
-        try {
-          const res = await call('adminSaveEmployee', payload);
-          EMP_DIR_CACHE = res.employees || [];
-          renderEmpDirectory();
-          toast(isEdit ? 'บันทึกข้อมูลพนักงานเรียบร้อย' : 'เพิ่มพนักงานใหม่เรียบร้อย', 'success');
-          loadInit();
-        } catch (err) { toast(err.message, 'error'); }
-      };
+        });
+        EMP_DIR_CACHE = res.employees || [];
+        EMP_DIR_NEW_MODE = false;
+        if (nextId) EMP_DIR_SELECTED_ID = nextId;
+        else if (!isEdit && EMP_DIR_CACHE.length) EMP_DIR_SELECTED_ID = String(EMP_DIR_CACHE[EMP_DIR_CACHE.length - 1].employee_id);
+        renderEmpDirectory();
+        toast(isEdit ? 'บันทึกข้อมูลพนักงานเรียบร้อย' : 'เพิ่มพนักงานใหม่เรียบร้อย', 'success');
+        loadInit();
+      } catch (err) { toast(err.message, 'error'); }
     }
   </script>
 </body>
