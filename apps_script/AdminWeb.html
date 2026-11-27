@@ -70,6 +70,13 @@
 
     .input, .select, .textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); outline: none; }
     .input:focus, .select:focus, .textarea:focus { border-color: var(--brand-2); box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+    .date-fmt-box { position: relative; display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); min-height: 41px; cursor: pointer; }
+    .date-fmt-box:focus-within { border-color: var(--brand-2); box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+    .date-fmt-text { font-size: 14px; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+    .date-fmt-text.empty { color: var(--muted); font-weight: 400; }
+    .date-fmt-ico { font-size: 14px; opacity: .7; }
+    .date-fmt-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+    .date-fmt-native::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; cursor: pointer; }
     .select-inline { width: auto; min-width: 260px; }
     .month-input { width: auto; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
@@ -722,9 +729,13 @@
             </div>
 
             <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; padding:14px; background:#f8fafc; border:1px solid var(--border); border-radius:10px; margin-bottom:16px;">
-              <div style="flex:0 0 180px;">
+              <div style="flex:0 0 185px;">
                 <label class="card-sub" for="newHolidayDate" style="display:block; margin-bottom:4px;">วันที่</label>
-                <input type="date" id="newHolidayDate" class="input" />
+                <div class="date-fmt-box">
+                  <span id="newHolDateDisp" class="date-fmt-text empty">เลือกวันที่...</span>
+                  <span class="date-fmt-ico">📅</span>
+                  <input type="date" id="newHolidayDate" class="date-fmt-native" onchange="$('newHolDateDisp').textContent=this.value?fmtDashDate(this.value):'เลือกวันที่...';$('newHolDateDisp').classList.toggle('empty',!this.value)" />
+                </div>
               </div>
               <div style="flex:1 1 240px;">
                 <label class="card-sub" for="newHolidayName" style="display:block; margin-bottom:4px;">ชื่อวันหยุด</label>
@@ -2041,6 +2052,7 @@
         const res = await call('adminAddHoliday', d, n);
         HOLIDAYS_CACHE = res.holidays || [];
         $('newHolidayDate').value = '';
+        if ($('newHolDateDisp')) { $('newHolDateDisp').textContent = 'เลือกวันที่...'; $('newHolDateDisp').classList.add('empty'); }
         $('newHolidayName').value = '';
         populateHolidayYears();
         renderHolidays();
@@ -3073,7 +3085,7 @@
               <div><label class="card-sub">แผนก</label><input id="efDept" class="input" value="${esc(e.department)}" placeholder="พนักงานขาย / ผลิตและจัดส่ง" /></div>
               <div><label class="card-sub">ตำแหน่ง</label><input id="efPos" class="input" value="${esc(e.position)}" /></div>
               <div><label class="card-sub">รหัสสแกนนิ้ว</label><input id="efFp" class="input" value="${esc(e.fingerprint_id)}" /></div>
-              <div><label class="card-sub">วันเริ่มงาน</label><input id="efHire" type="date" class="input" value="${esc(e.hire_date)}" /></div>
+              <div><label class="card-sub">วันเริ่มงาน</label><div class="date-fmt-box"><span id="efHireDisp" class="date-fmt-text ${e.hire_date ? '' : 'empty'}">${e.hire_date ? esc(fmtDashDate(e.hire_date)) : 'เลือกวันที่...'}</span><span class="date-fmt-ico">📅</span><input id="efHire" type="date" class="date-fmt-native" value="${esc(e.hire_date)}" onchange="$('efHireDisp').textContent=this.value?fmtDashDate(this.value):'เลือกวันที่...';$('efHireDisp').classList.toggle('empty',!this.value)" /></div></div>
               <div><label class="card-sub">โควตาพักร้อน (วัน/ปี)</label><input id="efVac" type="number" min="0" max="30" class="input" value="${esc(e.vacation_quota || '6')}" /></div>
               <div><label class="card-sub">สิทธิ์ในระบบ</label><select id="efRole" class="select"><option value="employee" ${e.role==='employee'?'selected':''}>employee</option><option value="supervisor" ${e.role==='supervisor'?'selected':''}>supervisor</option><option value="admin" ${e.role==='admin'?'selected':''}>admin</option></select></div>
               <div><label class="card-sub">สถานะ</label><select id="efStatus" class="select"><option value="ACTIVE" ${String(e.status).toUpperCase()==='ACTIVE'?'selected':''}>ACTIVE</option><option value="INACTIVE" ${String(e.status).toUpperCase()==='INACTIVE'?'selected':''}>INACTIVE</option></select></div>
@@ -3091,7 +3103,7 @@
               <div><label class="card-sub">เบอร์โทรศัพท์</label><input id="efPhone" class="input" value="${esc(e.phone)}" /></div>
               <div><label class="card-sub">ธนาคาร</label><input id="efBank" class="input" value="${esc(e.bank_name)}" placeholder="กสิกรไทย / SCB / กรุงไทย" /></div>
               <div><label class="card-sub">เลขที่บัญชี</label><input id="efBankAcc" class="input mono" value="${esc(e.bank_account)}" /></div>
-              <div><label class="card-sub">วันเริ่มเป็นสมาชิกกองทุนฯ (PVD)</label><input id="efPvdJoin" type="date" class="input" value="${esc(e.pvd_join_date)}" /></div>
+              <div><label class="card-sub">วันเริ่มเป็นสมาชิกกองทุนฯ (PVD)</label><div class="date-fmt-box"><span id="efPvdJoinDisp" class="date-fmt-text ${e.pvd_join_date ? '' : 'empty'}">${e.pvd_join_date ? esc(fmtDashDate(e.pvd_join_date)) : 'เลือกวันที่...'}</span><span class="date-fmt-ico">📅</span><input id="efPvdJoin" type="date" class="date-fmt-native" value="${esc(e.pvd_join_date)}" onchange="$('efPvdJoinDisp').textContent=this.value?fmtDashDate(this.value):'เลือกวันที่...';$('efPvdJoinDisp').classList.toggle('empty',!this.value)" /></div></div>
               <div style="grid-column:1 / -1;"><label class="card-sub">ที่อยู่</label><textarea id="efAddr" class="textarea" rows="2" placeholder="บ้านเลขที่ ตำบล อำเภอ จังหวัด รหัสไปรษณีย์">${esc(e.address)}</textarea></div>
             </div>
           </div>
