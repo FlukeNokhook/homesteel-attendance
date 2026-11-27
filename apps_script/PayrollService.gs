@@ -418,7 +418,7 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
 /**
  * อ่านข้อมูลสรุปเงินเดือนและสลิปจากชีต Calculation (รองรับโครงสร้างใหม่ A-AG และแจ้งเตือนถ้ายังเป็นโครงสร้างเก่า)
  */
-function getPayrollDashboardData() {
+function getPayrollDashboardData(yearMonth) {
   const payrollSs = getPayrollDb();
   const sheet = payrollSs.getSheetByName('Calculation');
   if (!sheet) throw new Error('ไม่พบชีต "Calculation" ใน Google Sheet เงินเดือนครับ');
@@ -438,6 +438,18 @@ function getPayrollDashboardData() {
     const k = normEmpCode(e.code || e.employee_id);
     if (k) empProfileByCode[k] = e;
   });
+
+  // รวมชั่วโมงลาที่ได้สิทธิ์ของแต่ละคนในเดือนที่เลือกจาก Attendance_Daily
+  const leaveHrsByCode = {};
+  const ym = String(yearMonth || '').trim();
+  if (/^\d{4}-\d{2}$/.test(ym)) {
+    repoReadAll(SHEETS.ATTENDANCE_DAILY).rows
+      .filter(r => String(r.work_date || '').indexOf(ym) === 0)
+      .forEach(r => {
+        const k = normEmpCode(r.code || r.employee_id);
+        if (k) leaveHrsByCode[k] = round2((leaveHrsByCode[k] || 0) + Number(r.leave_hours || 0));
+      });
+  }
 
   const employees = [];
   const startRow = isCleanLayout ? 1 : 2;
@@ -460,7 +472,7 @@ function getPayrollDashboardData() {
         pvd_join_date: repoNormalizeDate(prof.pvd_join_date || ''),
         hire_date: dateFmt(row[4]), hire_date_iso: repoNormalizeDate(prof.hire_date || row[4]),
         base_salary: numVal(row[5]),
-        work_days: numVal(row[6]), work_hours: numVal(row[7]), ot15_hours: numVal(row[8]), late_min: numVal(row[9]), absent_hours: numVal(row[10]),
+        work_days: numVal(row[6]), work_hours: numVal(row[7]), leave_hours: leaveHrsByCode[normEmpCode(code)] || 0, ot15_hours: numVal(row[8]), late_min: numVal(row[9]), absent_hours: numVal(row[10]),
         ot_baht: numVal(row[11]), commission: numVal(row[12]), measurement: numVal(row[13]), frame_bonus: numVal(row[14]),
         diligence: numVal(row[15]), position_allowance: numVal(row[16]), phone_allowance: numVal(row[17]),
         deduct_absent: numVal(row[18]), deduct_late: numVal(row[19]),

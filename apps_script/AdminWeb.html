@@ -1456,7 +1456,7 @@
 
     async function loadPayroll() {
       try {
-        const res = await call('adminGetPayrollData');
+        const res = await call('adminGetPayrollData', $('monthPicker').value);
         PAYROLL_CACHE = res;
         if (res.sheetUrl) {
           $('openPayrollSheetLink').href = res.sheetUrl;
@@ -1572,6 +1572,7 @@
         <div class="pay-time-strip">
           <button type="button" class="pay-time-pill" onclick="showPayrollTimeDetail('work')">📅 มาทำงาน <b>${e.work_days || 0}</b> วัน ›</button>
           <button type="button" class="pay-time-pill" onclick="showPayrollTimeDetail('work')">🕒 ปกติ <b>${e.work_hours || 0}</b> ชม. ›</button>
+          <button type="button" class="pay-time-pill" style="${(e.leave_hours || 0) > 0 ? 'background:#eff6ff; color:#1e40af; border-color:#bfdbfe;' : ''}" onclick="showPayrollTimeDetail('leave')">📝 ลา(ได้สิทธิ์) <b>${e.leave_hours || 0}</b> ชม. ›</button>
           <button type="button" class="pay-time-pill" onclick="showPayrollTimeDetail('ot')">💪 OT <b>${e.ot15_hours || 0}</b> ชม. ›</button>
           <button type="button" class="pay-time-pill" onclick="showPayrollTimeDetail('late')">⏰ สาย <b>${e.late_min || 0}</b> น. ›</button>
           <button type="button" class="pay-time-pill" onclick="showPayrollTimeDetail('absent')">🚫 ขาด <b>${e.absent_hours || 0}</b> ชม. ›</button>
@@ -1806,6 +1807,20 @@
             <tbody>${abs.map(r => `<tr><td class="mono">${esc(shortDate(r.work_date))}</td><td class="num" style="color:var(--red);"><b>${(Number(r.absent_min) / 60).toFixed(1)}</b></td><td><span class="pill pill-red">${esc(r.status)}</span></td><td>${esc(r.admin_note || 'ไม่มีสแกนนิ้วและไม่มีใบลา')}</td></tr>`).join('')}</tbody></table></div>`
             : emptyState('🎉', 'ไม่มีรายการขาดงานในเดือนนี้');
           modal({ title: `🚫 รายละเอียดขาดงาน • ${empName}`, body: `ในระบบลงเวลาล่าสุด: ขาดงานรวม ${liveAbsHrs} ชม. (ใน Calculation ตอนนี้: ${e.absent_hours || 0} ชม.)`, html: syncBanner + rows, wide: true, hideConfirm: true });
+          return;
+        }
+        if (kind === 'leave') {
+          const leaves = d.leaves || [];
+          const rows = leaves.length ? `<div class="table-wrap"><table>
+            <thead><tr><th>วันที่</th><th>ประเภทการลา</th><th class="num">จำนวน</th><th>เหตุผล</th><th>สถานะ</th></tr></thead>
+            <tbody>${leaves.map(l => `<tr>
+              <td class="mono">${esc(shortDate(l.start_date))}${l.end_date !== l.start_date ? ' – ' + esc(shortDate(l.end_date)) : ''}</td>
+              <td><b>${esc(l.leave_type)}</b></td>
+              <td class="num">${l.duration_mode === 'HOURS' ? esc(l.hours) + ' ชม.' : esc(l.days) + ' วัน'}</td>
+              <td>${esc(l.reason || '-')}</td>
+              <td><span class="pill pill-blue">${esc(l.status)}</span></td>
+            </tr>`).join('')}</tbody></table></div>` : emptyState('📝', 'ไม่มีรายการลาในเดือนนี้');
+          modal({ title: `📝 ชั่วโมงจากวันลาที่ได้สิทธิ์ • ${empName}`, body: `รวมชั่วโมงลาที่ได้สิทธิ์ ${s.totalLeaveHours || 0} ชม. (ได้รับค่าจ้างตามฐานเงินเดือนปกติ และนำไปรวมกับชั่วโมงทำงานปกติตอนหารค่าคอมมิชชั่น)`, html: rows, wide: true, hideConfirm: true });
           return;
         }
         if (kind === 'ot') {

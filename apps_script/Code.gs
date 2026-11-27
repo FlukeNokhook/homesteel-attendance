@@ -236,9 +236,9 @@ function adminSetupCleanPayroll(adminSecret) {
   return withScriptLock(() => setupCleanPayrollSheet('ADMIN'));
 }
 
-function adminGetPayrollData(adminSecret) {
+function adminGetPayrollData(adminSecret, yearMonth) {
   verifyAdminSecret(adminSecret);
-  return getPayrollDashboardData();
+  return getPayrollDashboardData(yearMonth);
 }
 
 function adminUpdatePayrollRow(adminSecret, rowIndex, updates) {
