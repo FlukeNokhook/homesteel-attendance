@@ -3104,6 +3104,7 @@
               <div><label class="card-sub">ธนาคาร</label><input id="efBank" class="input" value="${esc(e.bank_name)}" placeholder="กสิกรไทย / SCB / กรุงไทย" /></div>
               <div><label class="card-sub">เลขที่บัญชี</label><input id="efBankAcc" class="input mono" value="${esc(e.bank_account)}" /></div>
               <div><label class="card-sub">วันเริ่มเป็นสมาชิกกองทุนฯ (PVD)</label><div class="date-fmt-box"><span id="efPvdJoinDisp" class="date-fmt-text ${e.pvd_join_date ? '' : 'is-empty'}">${e.pvd_join_date ? esc(fmtDashDate(e.pvd_join_date)) : 'เลือกวันที่...'}</span><span class="date-fmt-ico">📅</span><input id="efPvdJoin" type="date" class="date-fmt-native" value="${esc(e.pvd_join_date)}" onchange="$('efPvdJoinDisp').textContent=this.value?fmtDashDate(this.value):'เลือกวันที่...';$('efPvdJoinDisp').classList.toggle('is-empty',!this.value)" /></div></div>
+              <div><label class="card-sub">อัตรา PVD พนักงานสะสม (%)</label><input id="efPvdRate" type="number" step="0.5" min="0" max="15" class="input" value="${esc(e.pvd_rate || '0')}" placeholder="0 หรือ 1–15" /></div>
               <div style="grid-column:1 / -1;"><label class="card-sub">ที่อยู่</label><textarea id="efAddr" class="textarea" rows="2" placeholder="บ้านเลขที่ ตำบล อำเภอ จังหวัด รหัสไปรษณีย์">${esc(e.address)}</textarea></div>
             </div>
           </div>
@@ -3147,6 +3148,7 @@
           bank_name: $('efBank').value.trim(),
           bank_account: $('efBankAcc').value.trim(),
           pvd_join_date: $('efPvdJoin').value,
+          pvd_rate: $('efPvdRate').value,
           address: $('efAddr').value.trim()
         });
         EMP_DIR_CACHE = res.employees || [];

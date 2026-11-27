@@ -8,7 +8,7 @@ const DB_SCHEMA = {
   Employees: [
     'employee_id', 'code', 'name', 'nickname', 'department', 'position',
     'fingerprint_id', 'line_user_id', 'role', 'supervisor_id', 'status', 'hire_date', 'vacation_quota',
-    'title', 'national_id', 'email', 'phone', 'address', 'bank_name', 'bank_account', 'pvd_join_date'
+    'title', 'national_id', 'email', 'phone', 'address', 'bank_name', 'bank_account', 'pvd_join_date', 'pvd_rate'
   ],
   Attendance_Daily: [
     'work_date', 'employee_id', 'code', 'name', 'first_in', 'last_out',

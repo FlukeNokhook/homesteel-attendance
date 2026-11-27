@@ -341,7 +341,9 @@ function getPayrollDashboardData() {
         work_days: numVal(row[6]), work_hours: numVal(row[7]), ot15_hours: numVal(row[8]), late_min: numVal(row[9]), absent_hours: numVal(row[10]),
         ot_baht: numVal(row[11]), commission: numVal(row[12]), measurement: numVal(row[13]), frame_bonus: numVal(row[14]),
         diligence: numVal(row[15]), position_allowance: numVal(row[16]), phone_allowance: numVal(row[17]),
-        deduct_absent: numVal(row[18]), deduct_late: numVal(row[19]), pvd_rate: Number(row[20]) || 0, deduct_pvd: numVal(row[21]),
+        deduct_absent: numVal(row[18]), deduct_late: numVal(row[19]),
+        pvd_rate: (Number(row[20]) || 0) || ((Number(prof.pvd_rate) || 0) / 100),
+        deduct_pvd: numVal(row[21]),
         deduct_uniform: numVal(row[22]), deduct_goods: numVal(row[23]), deduct_damage: numVal(row[24]),
         deduct_other: numVal(row[25]), deduct_forbid_absent: numVal(row[26]),
         gross_income: numVal(row[27]), sso: numVal(row[28]), tax: numVal(row[29]), net_pay: numVal(row[30]),
@@ -1043,12 +1045,20 @@ function savePvdRates(updatesList, actor) {
   if (!Array.isArray(updatesList) || !updatesList.length) {
     throw new Error('ไม่มีข้อมูลอัตรา PVD ที่เปลี่ยนแปลงครับ');
   }
+  ensureEmployeeProfileColumns();
   const payrollSs = getPayrollDb();
   const sheet = payrollSs.getSheetByName('Calculation');
   if (!sheet || sheet.getLastRow() < 2) throw new Error('ไม่พบชีต "Calculation" ในไฟล์เงินเดือนครับ');
   if (String(sheet.getRange(1, 7).getValue()).indexOf('วันมาทำงาน') === -1) {
     throw new Error('ชีต Calculation ยังไม่ใช่โครงสร้างใหม่ครับ');
   }
+
+  const empRows = repoReadAll(SHEETS.EMPLOYEES).rows;
+  const empByCode = {};
+  empRows.forEach(e => {
+    const k = normEmpCode(e.code || e.employee_id);
+    if (k) empByCode[k] = e;
+  });
 
   const changed = [];
   updatesList.forEach(item => {
@@ -1058,15 +1068,27 @@ function savePvdRates(updatesList, actor) {
     const dec = Math.round(pct * 100) / 10000; // เช่น 3 -> 0.03, 2.5 -> 0.025
     const cell = sheet.getRange(rIdx, 21); // คอลัมน์ U (% กองทุนสำรองฯ)
     const oldVal = Number(cell.getValue()) || 0;
-    if (Math.abs(oldVal - dec) > 0.00001) {
+    const calcCode = normEmpCode(sheet.getRange(rIdx, 1).getValue());
+    const empRec = empByCode[calcCode];
+
+    const calcChanged = Math.abs(oldVal - dec) > 0.00001;
+    const empChanged = empRec && String(empRec.pvd_rate || '') !== String(pct);
+
+    if (calcChanged) {
       cell.setValue(dec).setNumberFormat('0.0%');
-      changed.push({ rowIndex: rIdx, oldPct: Math.round(oldVal * 1000) / 10, newPct: pct });
+    }
+    if (empChanged) {
+      repoUpdateRow(SHEETS.EMPLOYEES, empRec._rowIndex, { pvd_rate: String(pct) });
+    }
+    if (calcChanged || empChanged) {
+      changed.push({ rowIndex: rIdx, code: calcCode, oldPct: Math.round(oldVal * 1000) / 10, newPct: pct });
     }
   });
 
   SpreadsheetApp.flush();
   if (changed.length) {
-    repoAppendAuditLog(actor || 'admin', 'UPDATE_PVD_RATES', 'Calculation', 'PVD_BATCH', null, changed, 'แก้ไขอัตรากองทุนสำรองเลี้ยงชีพ (PVD) จาก Dashboard');
+    repoClearCache();
+    repoAppendAuditLog(actor || 'admin', 'UPDATE_PVD_RATES', 'Employees+Calculation', 'PVD_BATCH', null, changed, 'แก้ไขอัตรากองทุนสำรองเลี้ยงชีพ (PVD) จาก Dashboard');
   }
   return { ok: true, updatedCount: changed.length, payroll: getPayrollDashboardData() };
 }
@@ -1097,7 +1119,8 @@ function listAllEmployeesAdmin() {
     address: String(e.address || ''),
     bank_name: String(e.bank_name || ''),
     bank_account: String(e.bank_account || ''),
-    pvd_join_date: repoNormalizeDate(e.pvd_join_date || '')
+    pvd_join_date: repoNormalizeDate(e.pvd_join_date || ''),
+    pvd_rate: e.pvd_rate !== undefined && e.pvd_rate !== '' ? String(e.pvd_rate) : '0'
   }));
 }
 
@@ -1124,6 +1147,7 @@ function saveEmployeeAdmin(payload, actor) {
     throw new Error('รหัสสแกนนิ้ว (fingerprint_id) ' + fpId + ' ซ้ำกับพนักงานคนอื่นครับ');
   }
 
+  const pvdPct = Math.max(0, Math.min(15, Number(payload.pvd_rate) || 0));
   const rec = {
     employee_id: empId,
     code: String(payload.code || '').trim(),
@@ -1145,14 +1169,15 @@ function saveEmployeeAdmin(payload, actor) {
     address: String(payload.address || '').trim(),
     bank_name: String(payload.bank_name || '').trim(),
     bank_account: String(payload.bank_account || '').trim(),
-    pvd_join_date: repoNormalizeDate(payload.pvd_join_date || '')
+    pvd_join_date: repoNormalizeDate(payload.pvd_join_date || ''),
+    pvd_rate: String(pvdPct)
   };
 
   if (target) {
     repoUpdateRow(SHEETS.EMPLOYEES, target._rowIndex, rec);
     repoAppendAuditLog(actor || 'admin', 'UPDATE_EMPLOYEE', SHEETS.EMPLOYEES, empId,
       { name: target.name, status: target.status, role: target.role },
-      { name: rec.name, status: rec.status, role: rec.role, pvd_join_date: rec.pvd_join_date }, 'แก้ไขทะเบียนพนักงานจาก Dashboard');
+      { name: rec.name, status: rec.status, role: rec.role, pvd_join_date: rec.pvd_join_date, pvd_rate: rec.pvd_rate }, 'แก้ไขทะเบียนพนักงานจาก Dashboard');
   } else {
     repoAppendRow(SHEETS.EMPLOYEES, rec);
     repoAppendAuditLog(actor || 'admin', 'ADD_EMPLOYEE', SHEETS.EMPLOYEES, empId, null,
@@ -1160,7 +1185,7 @@ function saveEmployeeAdmin(payload, actor) {
   }
   repoClearCache();
 
-  // ซิงก์ชื่อธนาคารและเลขบัญชีเข้า Calculation หากมีแถวพนักงานคนนี้อยู่แล้ว
+  // ซิงก์ชื่อ ตำแหน่ง วันเริ่มงาน ธนาคาร เลขบัญชี และ % PVD เข้า Calculation หากมีแถวพนักงานคนนี้อยู่แล้ว
   try {
     const cfg = getAppConfig();
     if (cfg.PAYROLL_SHEET_ID && rec.code) {
@@ -1172,6 +1197,9 @@ function saveEmployeeAdmin(payload, actor) {
           if (normEmpCode(codes[i][0]) === k) {
             const rIdx = i + 2;
             calcSheet.getRange(rIdx, 2, 1, 4).setValues([[rec.name, rec.nickname, rec.position, rec.hire_date]]);
+            if (payload.pvd_rate !== undefined && payload.pvd_rate !== '') {
+              calcSheet.getRange(rIdx, 21).setValue(Math.round(pvdPct * 100) / 10000).setNumberFormat('0.0%');
+            }
             if (rec.bank_name || rec.bank_account) {
               calcSheet.getRange(rIdx, 32, 1, 2).setNumberFormat('@').setValues([[rec.bank_name, rec.bank_account]]);
             }
