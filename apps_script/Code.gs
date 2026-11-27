@@ -319,3 +319,13 @@ function adminSaveMonthCommission(adminSecret, payload) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => saveMonthCommission(payload, 'ADMIN'));
 }
+
+function adminGetYearGrossSales(adminSecret, year) {
+  verifyAdminSecret(adminSecret);
+  return getYearGrossSales(year);
+}
+
+function adminSaveYearGrossSales(adminSecret, year, monthlyMap) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => saveYearGrossSales(year, monthlyMap, 'ADMIN'));
+}

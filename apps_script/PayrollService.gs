@@ -975,3 +975,53 @@ function syncCommissionToCalculation(yearMonth) {
     return false;
   }
 }
+
+function getYearGrossSales(year) {
+  ensureBonusSheets();
+  const y = String(year || '').trim();
+  const rows = repoReadAll(SHEETS.COMMISSION_MONTHLY).rows;
+  const map = {};
+  rows.forEach(r => {
+    const ym = String(r.year_month || '').trim();
+    if (ym.indexOf(y + '-') === 0) {
+      map[ym] = Number(r.gross_sales) || 0;
+    }
+  });
+  return { year: y, months: map };
+}
+
+function saveYearGrossSales(year, monthlyMap, actor) {
+  ensureBonusSheets();
+  const y = String(year || '').trim();
+  if (!/^\d{4}$/.test(y)) throw new Error('รูปแบบปีไม่ถูกต้องครับ');
+  const existingRows = repoReadAll(SHEETS.COMMISSION_MONTHLY).rows;
+  const byYm = {};
+  existingRows.forEach(r => { byYm[String(r.year_month || '').trim()] = r; });
+
+  let savedCount = 0;
+  for (let m = 1; m <= 12; m++) {
+    const ym = y + '-' + pad2(m);
+    if (monthlyMap[ym] === undefined || monthlyMap[ym] === '') continue;
+    const val = round2(Number(monthlyMap[ym]) || 0);
+    if (byYm[ym]) {
+      repoUpdateRow(SHEETS.COMMISSION_MONTHLY, byYm[ym]._rowIndex, {
+        gross_sales: val,
+        updated_by: actor || 'admin',
+        updated_at: nowStr()
+      });
+    } else if (val > 0) {
+      repoAppendRow(SHEETS.COMMISSION_MONTHLY, {
+        year_month: ym,
+        gross_sales: val,
+        prev_year_sales: 0, capital: 100000, credit_note: 0, incident_case: 0, supercoil: 18000,
+        net_sales: 0, pv_project_sales: 0, front_store_sales: 0, extra_prod_sales: 0,
+        rate_full_pct: 0.1, rate_half_pct: 0.05, sales_kpi_deduct: 0, prod_kpi_deduct: 0,
+        sales_pool: 0, prod_pool: 0, sales_hours_total: 0, prod_hours_total: 0,
+        allocations_json: '[]', updated_by: actor || 'admin', updated_at: nowStr()
+      });
+    }
+    savedCount++;
+  }
+  repoAppendAuditLog(actor || 'admin', 'SAVE_YEAR_GROSS_SALES', SHEETS.COMMISSION_MONTHLY, y, null, monthlyMap, 'บันทึกยอดขายย้อนหลังรายปีสำหรับเทียบ YoY');
+  return { ok: true, savedCount: savedCount };
+}
