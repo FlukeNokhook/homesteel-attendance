@@ -26,6 +26,15 @@ function sendLinePush(lineUserId, textMessage) {
   }
 }
 
+function formatThaiFullDate(input) {
+  const s = String(input || '').trim();
+  if (!s) return '-';
+  const months = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+  return s.replace(/(\d{4})-(\d{2})-(\d{2})/g, function (_, y, m, d) {
+    return parseInt(d, 10) + ' ' + months[parseInt(m, 10) - 1] + ' ' + (parseInt(y, 10) + 543);
+  });
+}
+
 function formatLeaveDur(rec) {
   if (rec.duration_mode === 'HOURS') return rec.hours + ' ชั่วโมง';
   return rec.days + ' วัน';
@@ -38,7 +47,7 @@ function notifyApproverNewLeave(rec, extra) {
   const header = isApprovalNeeded
     ? '🌴 มีคำขอลาพักร้อนรออนุมัติครับ'
     : '📋 แจ้งเพื่อทราบ: พนักงานยื่น' + rec.leave_type;
-  const dateText = rec.start_date + (rec.end_date !== rec.start_date ? ' ถึง ' + rec.end_date : '');
+  const dateText = formatThaiFullDate(rec.start_date) + (rec.end_date !== rec.start_date ? ' ถึง ' + formatThaiFullDate(rec.end_date) : '');
 
   let sickLine = '';
   let sickSummaryLine = '';
@@ -93,7 +102,7 @@ function notifyApproverNewOT(rec, actualScan) {
     '⏰ มีคำขอทำโอทีรออนุมัติครับ',
     '',
     '👤 ' + rec.name,
-    '📅 ' + rec.ot_date + ' • ' + rec.requested_start + '-' + rec.requested_end + ' (' + rec.requested_hours + ' ชม.)',
+    '📅 ' + formatThaiFullDate(rec.ot_date) + ' • ' + rec.requested_start + '-' + rec.requested_end + ' (' + rec.requested_hours + ' ชม.)',
     '🔧 งาน: ' + (rec.job_reference || '-'),
     scanLine,
     rec.reason ? '💬 ' + rec.reason : '',
@@ -109,7 +118,7 @@ function notifyApproverMissedScan(rec) {
     '🔔 พนักงานแจ้งลืมสแกนนิ้ว (ส่งเข้า Exception List แล้ว)',
     '',
     '👤 ' + rec.name,
-    '📅 วันที่: ' + rec.work_date + ' (ลืมสแกน' + scanLabel + ')',
+    '📅 วันที่: ' + formatThaiFullDate(rec.work_date) + ' (ลืมสแกน' + scanLabel + ')',
     rec.approx_time ? '🕐 เวลาโดยประมาณ: ' + rec.approx_time : '',
     '💬 เหตุผล: ' + (rec.reason || '-')
   ].filter(Boolean).join('\n');
@@ -120,7 +129,7 @@ function notifyApproverMissedScan(rec) {
 function notifyApproverMedicalCertUploaded(rec) {
   const msg = [
     '📎 พนักงานแนบใบรับรองแพทย์เพิ่มเติมแล้วครับ',
-    '👤 ' + rec.name + ' • ลาป่วยวันที่ ' + rec.start_date,
+    '👤 ' + rec.name + ' • ลาป่วยวันที่ ' + formatThaiFullDate(rec.start_date),
     'ระบบปรับสถานะเป็นมีใบรับรองแพทย์เรียบร้อยแล้ว'
   ].join('\n');
 
@@ -130,23 +139,25 @@ function notifyApproverMedicalCertUploaded(rec) {
 function notifyEmployeeDecision(empId, typeLabel, dateLabel, isApproved, rejectReason) {
   const emp = repoFindEmployeeById(empId);
   if (!emp || !emp.line_user_id) return;
+  const dTxt = formatThaiFullDate(dateLabel);
   const msg = isApproved
-    ? '✅ คำขอ' + typeLabel + ' วันที่ ' + dateLabel + ' ได้รับการอนุมัติเรียบร้อยแล้วครับ'
-    : 'แจ้งให้ทราบครับ คำขอ' + typeLabel + ' วันที่ ' + dateLabel + ' ยังไม่ได้รับการอนุมัติ\nเหตุผล: ' + (rejectReason || 'รบกวนสอบถามรายละเอียดเพิ่มเติมนะครับ');
+    ? '✅ คำขอ' + typeLabel + ' วันที่ ' + dTxt + ' ได้รับการอนุมัติเรียบร้อยแล้วครับ'
+    : 'แจ้งให้ทราบครับ คำขอ' + typeLabel + ' วันที่ ' + dTxt + ' ยังไม่ได้รับการอนุมัติ\nเหตุผล: ' + (rejectReason || 'รบกวนสอบถามรายละเอียดเพิ่มเติมนะครับ');
   sendLinePush(emp.line_user_id, msg);
 }
 
 function notifyEmployeeSickDecision(empId, dateLabel, allowBenefit, note) {
   const emp = repoFindEmployeeById(empId);
   if (!emp || !emp.line_user_id) return;
+  const dTxt = formatThaiFullDate(dateLabel);
   const msg = allowBenefit
-    ? '✅ หัวหน้างานรับทราบใบลาป่วย วันที่ ' + dateLabel + ' และอนุมัติให้ใช้สิทธิ์ลาป่วยได้ครับ'
-    : '⚠️ หัวหน้างานรับทราบใบลาป่วย วันที่ ' + dateLabel + ' แต่ไม่อนุมัติการใช้สิทธิ์ลาป่วยแบบได้รับค่าจ้าง\nหมายเหตุ: ' + (note || 'กรุณาติดต่อหัวหน้างานเพิ่มเติม');
+    ? '✅ หัวหน้างานรับทราบใบลาป่วย วันที่ ' + dTxt + ' และอนุมัติให้ใช้สิทธิ์ลาป่วยได้ครับ'
+    : '⚠️ หัวหน้างานรับทราบใบลาป่วย วันที่ ' + dTxt + ' แต่ไม่อนุมัติการใช้สิทธิ์ลาป่วยแบบได้รับค่าจ้าง\nหมายเหตุ: ' + (note || 'กรุณาติดต่อหัวหน้างานเพิ่มเติม');
   sendLinePush(emp.line_user_id, msg);
 }
 
 function notifyEmployeeAcknowledged(empId, leaveType, dateLabel) {
   const emp = repoFindEmployeeById(empId);
   if (!emp || !emp.line_user_id) return;
-  sendLinePush(emp.line_user_id, '👍 หัวหน้างานได้รับทราบใบ' + leaveType + ' วันที่ ' + dateLabel + ' เรียบร้อยแล้วครับ');
+  sendLinePush(emp.line_user_id, '👍 หัวหน้างานได้รับทราบใบ' + leaveType + ' วันที่ ' + formatThaiFullDate(dateLabel) + ' เรียบร้อยแล้วครับ');
 }

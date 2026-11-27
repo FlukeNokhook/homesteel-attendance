@@ -762,6 +762,7 @@
       settings: ['ตั้งค่าระบบ', 'จัดการวันหยุดนักขัตฤกษ์และการตั้งค่าอื่นๆ ของระบบ']
     };
     const DOW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+    const MONTH_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const MONTH_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
     const MONTH_TH_FULL = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 
@@ -778,8 +779,14 @@
     function num(v) { const n = Number(v) || 0; return n ? (Math.round(n * 100) / 100).toString() : '-'; }
     function ymNow() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
     function ymLabel(ym) { const [y, m] = ym.split('-'); return `${MONTH_TH_FULL[+m - 1]} ${+y + 543}`; }
-    function dateParts(ds) { const d = new Date(ds + 'T00:00:00'); return { day: d.getDate(), dow: DOW[d.getDay()], mon: MONTH_TH[d.getMonth()] }; }
-    function shortDate(ds) { if (!ds) return '-'; const p = dateParts(ds); return `${p.dow} ${p.day} ${p.mon}`; }
+    function ymDashLabel(ym) { const [y, m] = ym.split('-'); return `${MONTH_EN[+m - 1]}/${y}`; }
+    function dateParts(ds) { const d = new Date(ds + 'T00:00:00'); return { day: d.getDate(), dow: DOW[d.getDay()], mon: MONTH_EN[d.getMonth()], year: d.getFullYear() }; }
+    function fmtDashDate(ds) {
+      if (!ds || !/^\d{4}-\d{2}-\d{2}$/.test(String(ds).trim())) return ds || '-';
+      const [y, m, d] = String(ds).trim().split('-').map(Number);
+      return `${String(d).padStart(2, '0')}/${MONTH_EN[m - 1]}/${y}`;
+    }
+    function shortDate(ds) { return fmtDashDate(ds); }
     function initials(name) { return esc(String(name || '?').trim().charAt(0).toUpperCase()); }
 
     function setLoading(on) { loadingCount += on ? 1 : -1; $('loadingBar').classList.toggle('hidden', loadingCount <= 0); }
@@ -1992,7 +1999,7 @@
     function thaiFullDate(ds) {
       if (!ds) return '-';
       const d = new Date(ds + 'T00:00:00');
-      return `${DOW[d.getDay()]} ${d.getDate()} ${MONTH_TH[d.getMonth()]} ${d.getFullYear() + 543}`;
+      return `${DOW[d.getDay()]} ${fmtDashDate(ds)}`;
     }
 
     function renderHolidays() {
@@ -2819,7 +2826,7 @@
             <td>${i + 1}</td>
             <td><b>${esc(r.title ? r.title + ' ' : '')}${esc(r.name)}</b>${r.nickname && r.nickname !== r.name ? ` <span class="card-sub">(${esc(r.nickname)})</span>` : ''}<div class="card-sub mono">${esc(r.code)}</div></td>
             <td>
-              ${r.hasJoin ? `<div style="font-size:12px; font-weight:600; margin-bottom:2px;">เริ่ม ${esc(fmtThaiDmy(r.pvd_join_date))}</div>` : ''}
+              ${r.hasJoin ? `<div style="font-size:12px; font-weight:600; margin-bottom:2px;">เริ่ม ${esc(fmtDashDate(r.pvd_join_date))}</div>` : ''}
               ${capBadge}
             </td>
             <td class="num">${fmtBaht(r.base_salary)}</td>

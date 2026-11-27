@@ -9,6 +9,7 @@ let LATER_CERT_REQ_ID = '';
 
 const DOW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
 const MONTH_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const MONTH_TH_FULL = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const $ = id => document.getElementById(id);
 
 function esc(v) {
@@ -20,9 +21,9 @@ function todayIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function thaiDate(ds) {
-  if (!ds) return '-';
-  const d = new Date(ds + 'T00:00:00');
-  return `${DOW[d.getDay()]} ${d.getDate()} ${MONTH_TH[d.getMonth()]} ${String(d.getFullYear() + 543).slice(2)}`;
+  if (!ds || !/^\d{4}-\d{2}-\d{2}$/.test(String(ds).trim())) return ds || '-';
+  const [y, m, d] = String(ds).trim().split('-').map(Number);
+  return `${d} ${MONTH_TH_FULL[m - 1]} ${y + 543}`;
 }
 function minsToText(mins) {
   const h = Math.floor(mins / 60), m = mins % 60;
