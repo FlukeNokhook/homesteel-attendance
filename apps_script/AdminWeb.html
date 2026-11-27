@@ -786,6 +786,11 @@
       const [y, m, d] = String(ds).trim().split('-').map(Number);
       return `${String(d).padStart(2, '0')}/${MONTH_EN[m - 1]}/${y}`;
     }
+    function fmtThaiFullDate(ds) {
+      if (!ds || !/^\d{4}-\d{2}-\d{2}$/.test(String(ds).trim())) return ds || '-';
+      const [y, m, d] = String(ds).trim().split('-').map(Number);
+      return `${d} ${MONTH_TH_FULL[m - 1]} ${y + 543}`;
+    }
     function shortDate(ds) { return fmtDashDate(ds); }
     function initials(name) { return esc(String(name || '?').trim().charAt(0).toUpperCase()); }
 
@@ -1787,7 +1792,7 @@
         <table class="info-tbl">
           <tr>
             <td class="lbl">รหัสพนักงาน</td><td class="val">${esc(e.code)}</td>
-            <td class="lbl">วันที่เริ่มงาน</td><td class="val">${esc(e.hire_date || '-')}</td>
+            <td class="lbl">วันที่เริ่มงาน</td><td class="val">${esc(fmtThaiFullDate(e.hire_date_iso || e.hire_date))}</td>
           </tr>
           <tr>
             <td class="lbl">ชื่อ-สกุล</td><td class="val"><b>${esc(e.name)}</b></td>
