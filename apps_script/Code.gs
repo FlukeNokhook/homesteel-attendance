@@ -13,7 +13,7 @@ function doGet(e) {
   if (action === 'health') {
     return jsonResponse({ status: 'ok', time: nowStr() });
   }
-  return HtmlService.createHtmlOutputFromFile('AdminWeb')
+  return HtmlService.createTemplateFromFile('AdminWeb').evaluate()
     .setTitle('HomesteelKK • ระบบเวลา ลา และโอที')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }

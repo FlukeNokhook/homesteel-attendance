@@ -271,7 +271,9 @@
   <!-- Login -->
   <div id="loginView" class="login-wrap">
     <div class="login-card">
-      <div class="logo">🏭</div>
+      <div style="margin:0 auto 12px; display:flex; justify-content:center;">
+        <img src="<?= COMPANY_LOGO_DATA_URL ?>" alt="Homesteel" style="height:72px; width:auto; object-fit:contain;" />
+      </div>
       <h1>HomesteelKK</h1>
       <p>ระบบจัดการเวลาเข้างาน การลา และโอที<br>สำหรับผู้ดูแลระบบ</p>
       <label class="card-sub" for="adminSecretInput">รหัสผ่านผู้ดูแล</label>
@@ -285,7 +287,9 @@
   <div id="appView" class="app hidden">
     <aside class="sidebar">
       <div class="brand">
-        <div class="logo">🏭</div>
+        <div class="logo" style="background:#fff; padding:4px 6px; border-radius:10px; width:50px; height:42px; display:grid; place-items:center; flex-shrink:0;">
+          <img src="<?= COMPANY_LOGO_DATA_URL ?>" alt="Homesteel" style="max-width:100%; max-height:100%; object-fit:contain;" />
+        </div>
         <div><div class="brand-name">HomesteelKK</div><div class="brand-sub">ระบบเวลา ลา และโอที</div></div>
       </div>
       <button class="nav-item active" data-tab="overview"><span class="ico">📊</span>ภาพรวม & Exception</button>
