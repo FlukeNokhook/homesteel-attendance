@@ -329,3 +329,8 @@ function adminSaveYearGrossSales(adminSecret, year, monthlyMap) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => saveYearGrossSales(year, monthlyMap, 'ADMIN'));
 }
+
+function adminSavePvdRates(adminSecret, updatesList) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => savePvdRates(updatesList, 'ADMIN'));
+}

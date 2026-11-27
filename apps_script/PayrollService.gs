@@ -329,7 +329,7 @@ function getPayrollDashboardData() {
         work_days: numVal(row[6]), work_hours: numVal(row[7]), ot15_hours: numVal(row[8]), late_min: numVal(row[9]), absent_hours: numVal(row[10]),
         ot_baht: numVal(row[11]), commission: numVal(row[12]), measurement: numVal(row[13]), frame_bonus: numVal(row[14]),
         diligence: numVal(row[15]), position_allowance: numVal(row[16]), phone_allowance: numVal(row[17]),
-        deduct_absent: numVal(row[18]), deduct_late: numVal(row[19]), pvd_rate: numVal(row[20]), deduct_pvd: numVal(row[21]),
+        deduct_absent: numVal(row[18]), deduct_late: numVal(row[19]), pvd_rate: Number(row[20]) || 0, deduct_pvd: numVal(row[21]),
         deduct_uniform: numVal(row[22]), deduct_goods: numVal(row[23]), deduct_damage: numVal(row[24]),
         deduct_other: numVal(row[25]), deduct_forbid_absent: numVal(row[26]),
         gross_income: numVal(row[27]), sso: numVal(row[28]), tax: numVal(row[29]), net_pay: numVal(row[30]),
@@ -1024,4 +1024,36 @@ function saveYearGrossSales(year, monthlyMap, actor) {
   }
   repoAppendAuditLog(actor || 'admin', 'SAVE_YEAR_GROSS_SALES', SHEETS.COMMISSION_MONTHLY, y, null, monthlyMap, 'บันทึกยอดขายย้อนหลังรายปีสำหรับเทียบ YoY');
   return { ok: true, savedCount: savedCount };
+}
+
+function savePvdRates(updatesList, actor) {
+  if (!Array.isArray(updatesList) || !updatesList.length) {
+    throw new Error('ไม่มีข้อมูลอัตรา PVD ที่เปลี่ยนแปลงครับ');
+  }
+  const payrollSs = getPayrollDb();
+  const sheet = payrollSs.getSheetByName('Calculation');
+  if (!sheet || sheet.getLastRow() < 2) throw new Error('ไม่พบชีต "Calculation" ในไฟล์เงินเดือนครับ');
+  if (String(sheet.getRange(1, 7).getValue()).indexOf('วันมาทำงาน') === -1) {
+    throw new Error('ชีต Calculation ยังไม่ใช่โครงสร้างใหม่ครับ');
+  }
+
+  const changed = [];
+  updatesList.forEach(item => {
+    const rIdx = Number(item.rowIndex);
+    if (!rIdx || rIdx < 2) return;
+    const pct = Math.max(0, Math.min(15, Number(item.pvd_pct) || 0));
+    const dec = Math.round(pct * 100) / 10000; // เช่น 3 -> 0.03, 2.5 -> 0.025
+    const cell = sheet.getRange(rIdx, 21); // คอลัมน์ U (% กองทุนสำรองฯ)
+    const oldVal = Number(cell.getValue()) || 0;
+    if (Math.abs(oldVal - dec) > 0.00001) {
+      cell.setValue(dec).setNumberFormat('0.0%');
+      changed.push({ rowIndex: rIdx, oldPct: Math.round(oldVal * 1000) / 10, newPct: pct });
+    }
+  });
+
+  SpreadsheetApp.flush();
+  if (changed.length) {
+    repoAppendAuditLog(actor || 'admin', 'UPDATE_PVD_RATES', 'Calculation', 'PVD_BATCH', null, changed, 'แก้ไขอัตรากองทุนสำรองเลี้ยงชีพ (PVD) จาก Dashboard');
+  }
+  return { ok: true, updatedCount: changed.length, payroll: getPayrollDashboardData() };
 }
