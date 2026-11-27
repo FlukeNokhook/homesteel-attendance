@@ -174,6 +174,22 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
   const tcData = [tcHeaders];
   const byEmp = {};
 
+  // นับจำนวนสแกนดิบต่อ (employee_id|work_date) จาก Attendance_Raw_YYYY เพื่อยังหักค่าลืมสแกน 10 บ./ครั้ง แม้แอดมินจะเติมเวลาให้แล้ว
+  const rawCountByEmpDate = {};
+  try {
+    repoReadRawByYear(yearMonth.slice(0, 4)).rows.forEach(rw => {
+      const ts = String(rw.timestamp || '').trim();
+      if (ts.indexOf(yearMonth) !== 0) return;
+      const d = ts.slice(0, 10);
+      const eid = String(rw.employee_id || '').trim();
+      if (!eid || !d) return;
+      const rk = eid + '|' + d;
+      rawCountByEmpDate[rk] = (rawCountByEmpDate[rk] || 0) + 1;
+    });
+  } catch (e) {
+    Logger.log('read raw for missed scan penalty skip: ' + e.message);
+  }
+
   dailyRows.forEach(r => {
     const p = String(r.work_date).split('-');
     const off = isOffDay(String(r.work_date), holidaySet);
@@ -196,7 +212,19 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
     byEmp[key].lateMin += Number(r.late_min || 0);
     byEmp[key].absentMin += Number(r.absent_min || 0);
     byEmp[key].leaveHours += Number(r.leave_hours || 0);
-    if (String(r.missing_scan || '').trim()) byEmp[key].missingScanCount++;
+
+    const rawKey = String(r.employee_id || '').trim() + '|' + String(r.work_date || '').trim();
+    const rawCnt = rawCountByEmpDate[rawKey] || 0;
+    const noteStr = String(r.admin_note || '');
+    const isOffsiteNote = noteStr.indexOf('นอกสถานที่') !== -1 || noteStr.indexOf('ต่างจังหวัด') !== -1;
+    if (String(r.missing_scan || '').trim()) {
+      byEmp[key].missingScanCount += 1;
+    } else if (String(r.status || '').toUpperCase() === 'CORRECTED' && (r.first_in || r.last_out) && !isOffsiteNote) {
+      const expectedScans = (r.first_in ? 1 : 0) + (r.last_out ? 1 : 0);
+      if (rawCnt < expectedScans) {
+        byEmp[key].missingScanCount += (expectedScans - rawCnt);
+      }
+    }
     byEmp[key].days.push(r);
   });
 
