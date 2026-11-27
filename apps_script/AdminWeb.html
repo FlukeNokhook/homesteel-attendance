@@ -105,7 +105,8 @@
     .exc-chip.active .ec-cnt { background: rgba(255,255,255,.22); color: #fff; }
 
     .pay-split { display: grid; grid-template-columns: minmax(225px, 27%) minmax(0, 1fr); gap: 14px; align-items: stretch; }
-    .pay-list-pane { border: 1px solid var(--border); border-radius: 12px; background: #fff; overflow: hidden; display: flex; flex-direction: column; max-height: 760px; }
+    .pay-list-pane { position: relative; border: 1px solid var(--border); border-radius: 12px; background: #fff; overflow: hidden; min-height: 420px; }
+    .pay-list-inner { position: absolute; inset: 0; display: flex; flex-direction: column; }
     .pay-list-search { padding: 10px; border-bottom: 1px solid var(--border); background: #f8fafc; flex-shrink: 0; }
     .pay-list-scroll { flex: 1; overflow-y: auto; min-height: 0; }
     .pay-item { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; background: #fff; transition: background .12s; }
@@ -148,7 +149,7 @@
     .pay-live-nums .val-plus { color: #86efac; }
     .pay-live-nums .val-minus { color: #fca5a5; }
     .pay-live-nums .net { font-size: 20px; font-weight: 700; color: #4ade80; font-variant-numeric: tabular-nums; }
-    @media (max-width: 960px) { .pay-split { grid-template-columns: 1fr; } .pay-cols { grid-template-columns: 1fr; } .pay-list-pane { max-height: 260px; } }
+    @media (max-width: 960px) { .pay-split { grid-template-columns: 1fr; } .pay-cols { grid-template-columns: 1fr; } .pay-list-pane { min-height: 0; } .pay-list-inner { position: static; max-height: 260px; } }
     .stat { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); border: 1px solid rgba(226,232,240,.6); }
     .stat.clickable { cursor: pointer; transition: transform .12s, border-color .15s, box-shadow .15s; }
     .stat.clickable:hover { transform: translateY(-2px); border-color: var(--brand-2); box-shadow: 0 6px 18px rgba(29,78,216,.12); }
@@ -1450,12 +1451,12 @@
       if (!emps.length) return;
       $('payrollTableWrap').innerHTML = `
         <div class="pay-split">
-          <div class="pay-list-pane">
+          <div class="pay-list-pane"><div class="pay-list-inner">
             <div class="pay-list-search">
               <input id="paySearchInput" class="input" style="padding:8px 10px; font-size:13px;" placeholder="🔍 ค้นหาชื่อ / ชื่อเล่น / รหัส..." value="${esc(PAYROLL_SEARCH)}" oninput="PAYROLL_SEARCH=this.value; renderPayrollListOnly()" />
             </div>
             <div id="payListScroll" class="pay-list-scroll"></div>
-          </div>
+          </div></div>
           <div id="payDetailPane" class="pay-detail-pane"></div>
         </div>`;
       renderPayrollListOnly();
@@ -2956,7 +2957,7 @@
       }
       $('empDirTable').innerHTML = `
         <div class="pay-split">
-          <div class="pay-list-pane">
+          <div class="pay-list-pane"><div class="pay-list-inner">
             <div class="pay-list-search" style="display:grid; gap:6px;">
               <input class="input" style="padding:7px 10px; font-size:13px;" placeholder="🔍 ค้นหาชื่อ / รหัส / แผนก..." value="${esc(EMP_DIR_SEARCH)}" oninput="EMP_DIR_SEARCH=this.value; renderEmpDirList()" />
               <select class="select" style="padding:6px 10px; font-size:12.5px;" onchange="EMP_DIR_STATUS=this.value; renderEmpDirList()">
@@ -2966,7 +2967,7 @@
               </select>
             </div>
             <div id="empDirListScroll" class="pay-list-scroll"></div>
-          </div>
+          </div></div>
           <div id="empDirDetailPane" class="pay-detail-pane"></div>
         </div>`;
       renderEmpDirList();
