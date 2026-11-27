@@ -128,7 +128,8 @@
     .pay-detail-pane { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 16px; min-width: 0; }
     .pay-detail-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
     .pay-time-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; font-size: 12px; }
-    .pay-time-pill { background: #f1f5f9; color: #334155; padding: 4px 9px; border-radius: 7px; font-weight: 500; white-space: nowrap; }
+    .pay-time-pill { background: #f1f5f9; color: #334155; padding: 4px 10px; border-radius: 7px; font-weight: 500; white-space: nowrap; border: 1px solid transparent; cursor: pointer; font-family: inherit; font-size: 12px; transition: all .12s; }
+    .pay-time-pill:hover { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
     .pay-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
     .pay-box { border-radius: 12px; padding: 12px 13px; border: 1px solid var(--border); min-width: 0; }
     .pay-box-earn { background: #f0fdf4; border-color: #bbf7d0; }
@@ -1569,11 +1570,11 @@
         </div>
 
         <div class="pay-time-strip">
-          <span class="pay-time-pill">📅 มาทำงาน <b>${e.work_days || 0}</b> วัน</span>
-          <span class="pay-time-pill">🕒 ปกติ <b>${e.work_hours || 0}</b> ชม.</span>
-          <span class="pay-time-pill">💪 OT <b>${e.ot15_hours || 0}</b> ชม.</span>
-          <span class="pay-time-pill">⏰ สาย <b>${e.late_min || 0}</b> น.</span>
-          <span class="pay-time-pill">🚫 ขาด <b>${e.absent_hours || 0}</b> ชม.</span>
+          <button type="button" class="pay-time-pill" onclick="showPayrollTimeDetail('work')">📅 มาทำงาน <b>${e.work_days || 0}</b> วัน ›</button>
+          <button type="button" class="pay-time-pill" onclick="showPayrollTimeDetail('work')">🕒 ปกติ <b>${e.work_hours || 0}</b> ชม. ›</button>
+          <button type="button" class="pay-time-pill" onclick="showPayrollTimeDetail('ot')">💪 OT <b>${e.ot15_hours || 0}</b> ชม. ›</button>
+          <button type="button" class="pay-time-pill" onclick="showPayrollTimeDetail('late')">⏰ สาย <b>${e.late_min || 0}</b> น. ›</button>
+          <button type="button" class="pay-time-pill" onclick="showPayrollTimeDetail('absent')">🚫 ขาด <b>${e.absent_hours || 0}</b> ชม. ›</button>
         </div>
 
         <div class="pay-cols">
@@ -1755,6 +1756,79 @@
         const res = await call('adminSyncAccountingSummary', ym);
         if (res && res.ok) toast(`อัปเดตชีต "สรุปบัญชีเงินเดือน" งวด ${ymDashLabel(ym)} (${res.updatedRows} แถว) เรียบร้อย`, 'success');
         else toast((res && res.message) || 'ไม่สามารถอัปเดตสรุปบัญชีได้', 'error');
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    async function showPayrollTimeDetail(kind) {
+      const e = (PAYROLL_CACHE.employees || [])[PAYROLL_SELECTED_IDX];
+      if (!e) return;
+      const normCode = v => String(v || '').trim().replace(/^0+/, '') || String(v || '').trim();
+      const matched = (STATE.employees || []).find(x => normCode(x.code || x.employee_id) === normCode(e.code)) ||
+                      (STATE.employees || []).find(x => x.name === e.name);
+      const empId = matched ? matched.employee_id : e.code;
+      const ym = $('monthPicker').value;
+
+      try {
+        const d = await call('adminGetIndividualTimesheet', empId, ym);
+        const empName = e.name + (e.nickname && e.nickname !== e.name ? ` (${e.nickname})` : '');
+        let syncBanner = '';
+        const s = d.summary || {};
+        const liveWorkHrs = Math.round(((d.daily || []).reduce((sum, r) => sum + Number(r.work_minutes || 0), 0) / 60) * 100) / 100;
+        const liveAbsHrs = Math.round(((s.totalAbsentMin || 0) / 60) * 100) / 100;
+        const isOutOfSync =
+          (kind === 'late' && Math.round(s.totalLateMin || 0) !== Math.round(e.late_min || 0)) ||
+          (kind === 'absent' && Math.abs(liveAbsHrs - (Number(e.absent_hours) || 0)) > 0.05) ||
+          (kind === 'work' && (Number(s.workDays || 0) !== Number(e.work_days || 0) || Math.abs(liveWorkHrs - (Number(e.work_hours) || 0)) > 0.05)) ||
+          (kind === 'ot' && Math.abs((Number(s.totalOtPaid) || 0) - (Number(e.ot15_hours) || 0)) > 0.05);
+
+        if (isOutOfSync) {
+          syncBanner = `<div class="callout warn" style="margin-bottom:12px;">
+            <span>⚠️</span>
+            <div style="flex:1;">ข้อมูลในระบบลงเวลาล่าสุดไม่ตรงกับตัวเลขที่ซิงก์ไว้ใน <b>Calculation</b> (อาจเพิ่งมีการแก้ไขเวลาหรืออนุมัติใบลาใหม่)<br>
+              <button class="btn btn-primary btn-sm" style="margin-top:6px;" onclick="$('modalRoot').innerHTML=''; syncToPayrollSheet()">📤 ซิงก์เข้า Sheet ใหม่ตอนนี้</button>
+            </div>
+          </div>`;
+        }
+
+        if (kind === 'late') {
+          const lates = (d.daily || []).filter(r => Number(r.late_min) > 0);
+          const rows = lates.length ? `<div class="table-wrap"><table>
+            <thead><tr><th>วันที่</th><th>เวลาเข้า</th><th class="num">สาย (นาที)</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead>
+            <tbody>${lates.map(r => `<tr><td class="mono">${esc(shortDate(r.work_date))}</td><td class="mono">${esc(r.first_in)}</td><td class="num" style="color:var(--red);"><b>${r.late_min}</b></td><td><span class="pill pill-amber">${esc(r.status)}</span></td><td>${esc(r.admin_note || '-')}</td></tr>`).join('')}</tbody></table></div>`
+            : emptyState('✨', 'ไม่มีรายการมาสายใน Attendance_Daily ของเดือนนี้ (สายจริง = 0 นาที)');
+          modal({ title: `⏰ รายละเอียดมาสาย • ${empName}`, body: `ในระบบลงเวลาล่าสุด: สาย ${s.lateCount || 0} ครั้ง รวม ${s.totalLateMin || 0} นาที (ใน Calculation ตอนนี้: ${e.late_min || 0} นาที)`, html: syncBanner + rows, wide: true, hideConfirm: true });
+          return;
+        }
+        if (kind === 'absent') {
+          const abs = (d.daily || []).filter(r => Number(r.absent_min) > 0);
+          const rows = abs.length ? `<div class="table-wrap"><table>
+            <thead><tr><th>วันที่</th><th class="num">ขาดงาน (ชม.)</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead>
+            <tbody>${abs.map(r => `<tr><td class="mono">${esc(shortDate(r.work_date))}</td><td class="num" style="color:var(--red);"><b>${(Number(r.absent_min) / 60).toFixed(1)}</b></td><td><span class="pill pill-red">${esc(r.status)}</span></td><td>${esc(r.admin_note || 'ไม่มีสแกนนิ้วและไม่มีใบลา')}</td></tr>`).join('')}</tbody></table></div>`
+            : emptyState('🎉', 'ไม่มีรายการขาดงานในเดือนนี้');
+          modal({ title: `🚫 รายละเอียดขาดงาน • ${empName}`, body: `ในระบบลงเวลาล่าสุด: ขาดงานรวม ${liveAbsHrs} ชม. (ใน Calculation ตอนนี้: ${e.absent_hours || 0} ชม.)`, html: syncBanner + rows, wide: true, hideConfirm: true });
+          return;
+        }
+        if (kind === 'ot') {
+          const ots = d.ots || [];
+          const dailyMap = {};
+          (d.daily || []).forEach(r => { dailyMap[r.work_date] = r; });
+          const rows = ots.length ? `<div class="table-wrap"><table>
+            <thead><tr><th>วันที่</th><th>เวลาที่ขอ/อนุมัติ</th><th>งาน</th><th class="num">อนุมัติ (ชม.)</th><th class="num">จ่ายจริง (ชม.)</th><th>สถานะ</th></tr></thead>
+            <tbody>${ots.map(o => {
+              const dr = dailyMap[o.ot_date] || {};
+              return `<tr><td class="mono">${esc(shortDate(o.ot_date))}</td><td class="mono">${esc(o.approved_start || o.requested_start)}–${esc(o.approved_end || o.requested_end)}</td><td>${esc(o.job_reference || '-')}</td><td class="num">${esc(o.approved_hours || o.requested_hours)}</td><td class="num"><b>${esc(dr.ot_paid_hours !== undefined ? dr.ot_paid_hours : '-')}</b></td><td><span class="pill pill-gray">${esc(o.status)}</span></td></tr>`;
+            }).join('')}</tbody></table></div>` : emptyState('⏰', 'ไม่มีรายการ OT ในเดือนนี้');
+          modal({ title: `💪 รายละเอียดโอที • ${empName}`, body: `จ่ายจริงรวม ${s.totalOtPaid || 0} ชม. จากที่อนุมัติ ${s.totalOtApproved || 0} ชม.`, html: syncBanner + rows, wide: true, hideConfirm: true });
+          return;
+        }
+        if (kind === 'work') {
+          const days = (d.daily || []).filter(r => r.first_in || r.last_out || Number(r.work_minutes) > 0);
+          const rows = days.length ? `<div class="table-wrap"><table>
+            <thead><tr><th>วันที่</th><th>เข้า</th><th>ออก</th><th class="num">ชม.ปกติ</th><th class="num">สาย (น.)</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead>
+            <tbody>${days.map(r => `<tr><td class="mono">${esc(shortDate(r.work_date))}</td><td class="mono">${esc(r.first_in || '-')}</td><td class="mono">${esc(r.last_out || '-')}</td><td class="num">${hm(r.work_minutes)}</td><td class="num">${Number(r.late_min) || '-'}</td><td><span class="pill pill-gray">${esc(r.status)}</span></td><td>${esc(r.admin_note || '-')}</td></tr>`).join('')}</tbody></table></div>`
+            : emptyState('📅', 'ยังไม่มีวันที่มาทำงานในเดือนนี้');
+          modal({ title: `📅 รายละเอียดวันมาทำงาน • ${empName}`, body: `มาทำงาน ${s.workDays || 0} วัน • ชั่วโมงปกติรวม ${liveWorkHrs} ชม.`, html: syncBanner + rows, wide: true, hideConfirm: true });
+        }
       } catch (err) { toast(err.message, 'error'); }
     }
 
