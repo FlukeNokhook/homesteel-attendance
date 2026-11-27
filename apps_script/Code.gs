@@ -346,3 +346,8 @@ function adminSaveEmployee(adminSecret, payload) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => saveEmployeeAdmin(payload, 'ADMIN'));
 }
+
+function adminSyncAccountingSummary(adminSecret, yearMonth) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => updateMonthlyAccountingSummary(yearMonth, 'ADMIN'));
+}

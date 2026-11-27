@@ -188,7 +188,7 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
 
     const key = normEmpCode(r.code || r.employee_id);
     if (!byEmp[key]) {
-      byEmp[key] = { workDays: 0, workMin: 0, otHours: 0, lateMin: 0, absentMin: 0, leaveHours: 0 };
+      byEmp[key] = { workDays: 0, workMin: 0, otHours: 0, lateMin: 0, absentMin: 0, leaveHours: 0, missingScanCount: 0, days: [] };
     }
     if (r.first_in) byEmp[key].workDays++;
     byEmp[key].workMin += Number(r.work_minutes || 0);
@@ -196,6 +196,8 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
     byEmp[key].lateMin += Number(r.late_min || 0);
     byEmp[key].absentMin += Number(r.absent_min || 0);
     byEmp[key].leaveHours += Number(r.leave_hours || 0);
+    if (String(r.missing_scan || '').trim()) byEmp[key].missingScanCount++;
+    byEmp[key].days.push(r);
   });
 
   tcSheet.clearContents();
@@ -258,22 +260,33 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
 
     const lastRow = calcSheet.getLastRow();
     if (lastRow >= 2) {
+      ensureBonusSheets();
+      ensureEmployeeProfileColumns();
       const empByCode = {};
       repoReadAll(SHEETS.EMPLOYEES).rows.forEach(e => {
         const k = normEmpCode(e.code || e.employee_id);
         if (k) empByCode[k] = e;
       });
 
+      const prevStreakMap = getPrevMonthDiligenceStreaks(yearMonth);
       const codes = calcSheet.getRange(2, 1, lastRow - 1, 1).getValues();
       const profileGrid = calcSheet.getRange(2, 2, lastRow - 1, 4).getValues(); // B-E: name, nickname, position, hire_date
+      const baseSalaryCol = calcSheet.getRange(2, 6, lastRow - 1, 1).getValues(); // F: ฐานเงินเดือน
       const statsGrid = calcSheet.getRange(2, 7, lastRow - 1, 5).getValues();   // G-K
-      const diligenceCol = calcSheet.getRange(2, 16, lastRow - 1, 1).getValues(); // P
+      const diligenceCol = calcSheet.getRange(2, 16, lastRow - 1, 1).getValues(); // P: เบี้ยขยัน
       const pvdCol = calcSheet.getRange(2, 21, lastRow - 1, 1).getValues();       // U: % PVD
+      const uniformCol = calcSheet.getRange(2, 23, lastRow - 1, 1).getValues();   // W: หักชุดยูนิฟอร์ม
+      const otherDedCol = calcSheet.getRange(2, 26, lastRow - 1, 1).getValues();  // Z: เงินหักอื่นๆ (ลืมสแกน)
+      const forbidCol = calcSheet.getRange(2, 27, lastRow - 1, 1).getValues();    // AA: หักขาดวันห้ามหยุด
       const bankGrid = calcSheet.getRange(2, 32, lastRow - 1, 2).getValues();     // AF-AG: bank, account
+      const monthlyLogs = [];
 
       for (let i = 0; i < codes.length; i++) {
         const code = normEmpCode(codes[i][0]);
         const emp = empByCode[code];
+        const baseSalary = Number(baseSalaryCol[i][0]) || 0;
+        let uniformDeduct = 0;
+
         if (emp) {
           if (emp.name) profileGrid[i][0] = emp.name;
           if (emp.nickname) profileGrid[i][1] = emp.nickname;
@@ -287,6 +300,16 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
           }
           if (emp.bank_name) bankGrid[i][0] = String(emp.bank_name);
           if (emp.bank_account) bankGrid[i][1] = String(emp.bank_account);
+
+          // หักมัดจำชุดยูนิฟอร์มอัตโนมัติ (เป้า 4,000 บาท)
+          const paid = Number(emp.uniform_deposit_paid) || 0;
+          const monthly = Number(emp.uniform_monthly_deduct) || 0;
+          if (monthly > 0 && paid < 4000) {
+            uniformDeduct = Math.min(monthly, Math.max(0, 4000 - paid));
+            uniformCol[i][0] = -round2(uniformDeduct);
+          } else if (monthly > 0 && paid >= 4000) {
+            uniformCol[i][0] = 0;
+          }
         }
 
         const st = byEmp[code];
@@ -298,22 +321,65 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
           Math.round(st.lateMin),
           round2(st.absentMin / 60)
         ];
+
+        // 1) เบี้ยขยันต่อเนื่องอัตโนมัติ (500 -> 650 -> 800)
         const eligible = (st.lateMin === 0 && st.absentMin === 0 && st.leaveHours === 0 && st.workDays > 0);
-        if (!eligible) diligenceCol[i][0] = 0;
-        else if (!Number(diligenceCol[i][0])) diligenceCol[i][0] = 500;
+        let streak = 0;
+        let dilAmt = 0;
+        if (eligible) {
+          streak = (prevStreakMap[code] || 0) + 1;
+          dilAmt = streak >= 3 ? 800 : (streak === 2 ? 650 : 500);
+        }
+        diligenceCol[i][0] = dilAmt;
+
+        // 2) หักลืมสแกนนิ้วอัตโนมัติ (-10 บาท/ครั้ง)
+        const missedPenalty = st.missingScanCount > 0 ? -(st.missingScanCount * 10) : 0;
+        otherDedCol[i][0] = missedPenalty;
+
+        // 3) หักขาดวันห้ามหยุดอัตโนมัติ (หยุดติดกัน >= 3 วัน -> ตั้งแต่วันที่ 3 หักรวม 3 เท่า)
+        const forbid = computeForbidAbsentDeduction(st.days, baseSalary);
+        forbidCol[i][0] = forbid.deductAmount;
+
+        monthlyLogs.push({
+          year_month: yearMonth,
+          employee_id: emp ? String(emp.employee_id) : code,
+          code: emp ? String(emp.code || code) : String(codes[i][0] || code),
+          name: emp ? String(emp.name || '') : String(profileGrid[i][0] || ''),
+          work_days: st.workDays,
+          late_min: Math.round(st.lateMin),
+          absent_min: Math.round(st.absentMin),
+          leave_hours: round2(st.leaveHours),
+          diligence_eligible: eligible ? 'TRUE' : 'FALSE',
+          diligence_streak: streak,
+          diligence_amount: dilAmt,
+          missing_scan_count: st.missingScanCount,
+          forbid_absent_days: forbid.daysCount,
+          forbid_absent_deduct: forbid.deductAmount,
+          uniform_deducted: round2(uniformDeduct),
+          uniform_applied: 'FALSE',
+          updated_at: nowStr()
+        });
         calcUpdated++;
       }
+
       calcSheet.getRange(2, 2, lastRow - 1, 4).setValues(profileGrid);
       calcSheet.getRange(2, 7, lastRow - 1, 5).setValues(statsGrid);
       calcSheet.getRange(2, 16, lastRow - 1, 1).setValues(diligenceCol);
       calcSheet.getRange(2, 21, lastRow - 1, 1).setNumberFormat('0.0%').setValues(pvdCol);
+      calcSheet.getRange(2, 23, lastRow - 1, 1).setValues(uniformCol);
+      calcSheet.getRange(2, 26, lastRow - 1, 1).setValues(otherDedCol);
+      calcSheet.getRange(2, 27, lastRow - 1, 1).setValues(forbidCol);
       calcSheet.getRange(2, 32, lastRow - 1, 2).setNumberFormat('@').setValues(bankGrid);
+
+      upsertPayrollMonthlyLogs(yearMonth, monthlyLogs);
     }
   }
 
-  // ซิงก์ยอดรวม ค่าวัดหน้างาน (N), ค่าหาโครง (O), และ ค่าคอมมิชชั่น (M) ของเดือนนี้เข้าชีต Calculation ด้วย
+  // ซิงก์ยอดรวม ค่าวัดหน้างาน (N), ค่าหาโครง (O), ค่าคอมมิชชั่น (M), และอัปเดต สรุปบัญชีเงินเดือน
   syncBonusTotalsToCalculation(yearMonth);
   syncCommissionToCalculation(yearMonth);
+  SpreadsheetApp.flush();
+  updateMonthlyAccountingSummary(yearMonth, actor);
 
   repoAppendAuditLog(actor || 'admin', 'SYNC_PAYROLL', 'Calculation', yearMonth,
     null, { timeClockRows: tcData.length - 1, calcUpdated: calcUpdated, calcAdded: calcAdded }, 'ส่งข้อมูลเวลาเข้า Calculation + Time Clock');
@@ -1148,7 +1214,9 @@ function listAllEmployeesAdmin() {
     bank_name: String(e.bank_name || ''),
     bank_account: String(e.bank_account || ''),
     pvd_join_date: repoNormalizeDate(e.pvd_join_date || ''),
-    pvd_rate: e.pvd_rate !== undefined && e.pvd_rate !== '' ? String(e.pvd_rate) : '0'
+    pvd_rate: e.pvd_rate !== undefined && e.pvd_rate !== '' ? String(e.pvd_rate) : '0',
+    uniform_deposit_paid: e.uniform_deposit_paid !== undefined && e.uniform_deposit_paid !== '' ? String(e.uniform_deposit_paid) : '0',
+    uniform_monthly_deduct: e.uniform_monthly_deduct !== undefined && e.uniform_monthly_deduct !== '' ? String(e.uniform_monthly_deduct) : '0'
   }));
 }
 
@@ -1176,6 +1244,8 @@ function saveEmployeeAdmin(payload, actor) {
   }
 
   const pvdPct = Math.max(0, Math.min(15, Number(payload.pvd_rate) || 0));
+  const uniPaid = Math.max(0, Number(payload.uniform_deposit_paid) || 0);
+  const uniMonthly = Math.max(0, Number(payload.uniform_monthly_deduct) || 0);
   const rec = {
     employee_id: empId,
     code: String(payload.code || '').trim(),
@@ -1198,14 +1268,16 @@ function saveEmployeeAdmin(payload, actor) {
     bank_name: String(payload.bank_name || '').trim(),
     bank_account: String(payload.bank_account || '').trim(),
     pvd_join_date: repoNormalizeDate(payload.pvd_join_date || ''),
-    pvd_rate: String(pvdPct)
+    pvd_rate: String(pvdPct),
+    uniform_deposit_paid: String(round2(uniPaid)),
+    uniform_monthly_deduct: String(round2(uniMonthly))
   };
 
   if (target) {
     repoUpdateRow(SHEETS.EMPLOYEES, target._rowIndex, rec);
     repoAppendAuditLog(actor || 'admin', 'UPDATE_EMPLOYEE', SHEETS.EMPLOYEES, empId,
       { name: target.name, status: target.status, role: target.role },
-      { name: rec.name, status: rec.status, role: rec.role, pvd_join_date: rec.pvd_join_date, pvd_rate: rec.pvd_rate }, 'แก้ไขทะเบียนพนักงานจาก Dashboard');
+      { name: rec.name, status: rec.status, role: rec.role, pvd_join_date: rec.pvd_join_date, pvd_rate: rec.pvd_rate, uniform_deposit_paid: rec.uniform_deposit_paid }, 'แก้ไขทะเบียนพนักงานจาก Dashboard');
   } else {
     repoAppendRow(SHEETS.EMPLOYEES, rec);
     repoAppendAuditLog(actor || 'admin', 'ADD_EMPLOYEE', SHEETS.EMPLOYEES, empId, null,
@@ -1241,4 +1313,271 @@ function saveEmployeeAdmin(payload, actor) {
   }
 
   return { ok: true, employees: listAllEmployeesAdmin() };
+}
+
+/* ================= Payroll Automations: Diligence Streak, Forbid Absent 3x, Uniform, Accounting Summary ================= */
+
+function getPrevYearMonth(ym) {
+  const [y, m] = String(ym || '').split('-').map(Number);
+  if (!y || !m) return '';
+  return m === 1 ? (y - 1) + '-12' : y + '-' + pad2(m - 1);
+}
+
+/**
+ * อ่านจำนวนเดือนต่อเนื่องที่ผ่านเกณฑ์เบี้ยขยันของเดือนก่อนหน้าจาก Payroll_Monthly_Log
+ */
+function getPrevMonthDiligenceStreaks(yearMonth) {
+  const prevYm = getPrevYearMonth(yearMonth);
+  const map = {};
+  if (!prevYm) return map;
+  ensureBonusSheets();
+  repoReadAll(SHEETS.PAYROLL_MONTHLY_LOG).rows
+    .filter(r => String(r.year_month || '').trim() === prevYm)
+    .forEach(r => {
+      const k = normEmpCode(r.code || r.employee_id);
+      if (k) map[k] = Number(r.diligence_streak) || 0;
+    });
+  return map;
+}
+
+/**
+ * หักขาดวันห้ามหยุด: หยุด/ลา/ขาดติดต่อกัน >= 3 วันทำงาน -> ตั้งแต่วันที่ 3 หักรวม 3 เท่าของค่าแรงรายวัน
+ * (ถ้าวันนั้นเป็นวันขาดที่คอลัมน์ S หักไปแล้ว 1 เท่า ให้หักเพิ่มที่ AA อีก 2 เท่า; ถ้าเป็นวันลา ให้หัก 3 เท่าที่ AA)
+ */
+function computeForbidAbsentDeduction(empDailyRows, baseSalary) {
+  if (!empDailyRows || !empDailyRows.length || !baseSalary) return { daysCount: 0, deductAmount: 0 };
+  const sorted = empDailyRows.slice().sort((a, b) => String(a.work_date).localeCompare(String(b.work_date)));
+  const dailyWage = baseSalary / 30;
+  let streak = 0;
+  let forbidDays = 0;
+  let totalDeduct = 0;
+
+  sorted.forEach(r => {
+    const st = String(r.status || '').toUpperCase();
+    if (st === 'OFF' || st === 'UPCOMING') return; // วันหยุดประจำสัปดาห์/นักขัตฯ ไม่ตัดและไม่นับเพิ่ม
+    const absMin = Number(r.absent_min || 0);
+    const leaveHrs = Number(r.leave_hours || 0);
+    const isDayOff = (absMin >= 240) || (leaveHrs >= 4); // หยุด/ลา/ขาดอย่างน้อยครึ่งวันขึ้นไป
+    if (isDayOff) {
+      streak++;
+      if (streak >= 3) {
+        forbidDays++;
+        const alreadyDeductedRatio = Math.min(1, absMin / 480); // คอลัมน์ S หักไปแล้วเท่าไหร่ของวัน (0..1)
+        const extraMultiplier = Math.max(0, 3 - alreadyDeductedRatio);
+        totalDeduct += dailyWage * extraMultiplier;
+      }
+    } else {
+      streak = 0;
+    }
+  });
+  return { daysCount: forbidDays, deductAmount: totalDeduct > 0 ? -round2(totalDeduct) : 0 };
+}
+
+function upsertPayrollMonthlyLogs(yearMonth, logs) {
+  if (!logs || !logs.length) return;
+  ensureBonusSheets();
+  const sheet = repoGetMainDb().getSheetByName(SHEETS.PAYROLL_MONTHLY_LOG);
+  const headers = DB_SCHEMA.Payroll_Monthly_Log;
+  const existingRows = repoReadAll(SHEETS.PAYROLL_MONTHLY_LOG).rows;
+
+  // รักษาสถานะ uniform_applied เดิมไว้ไม่ให้ถูกรีเซ็ตหากงวดนั้นเคยทบยอดมัดจำยูนิฟอร์มไปแล้ว
+  const appliedMap = {};
+  existingRows.filter(r => String(r.year_month || '').trim() === yearMonth).forEach(r => {
+    if (String(r.uniform_applied).toUpperCase() === 'TRUE') {
+      appliedMap[normEmpCode(r.code || r.employee_id)] = 'TRUE';
+    }
+  });
+
+  const keep = existingRows
+    .filter(r => String(r.year_month || '').trim() !== yearMonth)
+    .map(r => headers.map(h => (r[h] !== undefined && r[h] !== null ? r[h] : '')));
+
+  const added = logs.map(obj => {
+    const k = normEmpCode(obj.code || obj.employee_id);
+    if (appliedMap[k] === 'TRUE') obj.uniform_applied = 'TRUE';
+    return headers.map(h => (obj[h] !== undefined && obj[h] !== null ? obj[h] : ''));
+  });
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, headers.length).clearContent();
+  repoWriteRowsAt(sheet, 2, keep.concat(added));
+}
+
+/**
+ * ทบยอดมัดจำชุดยูนิฟอร์มที่หักในเดือนนั้นเข้า Employees.uniform_deposit_paid เมื่อปิดงวด (Lock)
+ * (กันทบซ้ำด้วย flag uniform_applied = TRUE)
+ */
+function applyUniformDepositsOnLock(yearMonth, actor) {
+  try {
+    ensureBonusSheets();
+    ensureEmployeeProfileColumns();
+    const logs = repoReadAll(SHEETS.PAYROLL_MONTHLY_LOG).rows
+      .filter(r => String(r.year_month || '').trim() === yearMonth && String(r.uniform_applied).toUpperCase() !== 'TRUE');
+    if (!logs.length) return 0;
+
+    const empRows = repoReadAll(SHEETS.EMPLOYEES).rows;
+    const empByCode = {};
+    empRows.forEach(e => { empByCode[normEmpCode(e.code || e.employee_id)] = e; });
+
+    let count = 0;
+    logs.forEach(log => {
+      const amt = Math.abs(Number(log.uniform_deducted) || 0);
+      if (amt <= 0) return;
+      const emp = empByCode[normEmpCode(log.code || log.employee_id)];
+      if (!emp) return;
+      const newPaid = Math.min(4000, round2((Number(emp.uniform_deposit_paid) || 0) + amt));
+      repoUpdateRow(SHEETS.EMPLOYEES, emp._rowIndex, { uniform_deposit_paid: String(newPaid) });
+      repoUpdateRow(SHEETS.PAYROLL_MONTHLY_LOG, log._rowIndex, { uniform_applied: 'TRUE', updated_at: nowStr() });
+      count++;
+    });
+    if (count > 0) {
+      repoClearCache();
+      repoAppendAuditLog(actor || 'admin', 'APPLY_UNIFORM_DEPOSIT', SHEETS.EMPLOYEES, yearMonth, null, { updatedEmployees: count }, 'ทบยอดมัดจำชุดยูนิฟอร์มสะสมเมื่อปิดงวด');
+    }
+    return count;
+  } catch (e) {
+    Logger.log('applyUniformDepositsOnLock skip: ' + e.message);
+    return 0;
+  }
+}
+
+/**
+ * อัปเดตชีต "สรุปบัญชีเงินเดือน" ในไฟล์ HomesteelKK_Salary อัตโนมัติตามเดือนที่เลือก (Jan-Dec)
+ */
+function updateMonthlyAccountingSummary(yearMonth, actor) {
+  const ym = String(yearMonth || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(ym)) throw new Error('รูปแบบเดือนไม่ถูกต้องครับ');
+  const [yr, mo] = ym.split('-').map(Number);
+  const targetCol = mo + 1; // Jan=B(2), Feb=C(3), ..., Dec=M(13)
+
+  const payrollSs = getPayrollDb();
+  const sumSheet = payrollSs.getSheetByName('สรุปบัญชีเงินเดือน');
+  if (!sumSheet) return { ok: false, message: 'ไม่พบชีต "สรุปบัญชีเงินเดือน"' };
+
+  const data = getPayrollDashboardData();
+  const emps = data.employees || [];
+  if (!emps.length) return { ok: false, message: 'ไม่มีข้อมูลพนักงานใน Calculation' };
+
+  const empMetaByCode = {};
+  repoReadAll(SHEETS.EMPLOYEES).rows.forEach(e => {
+    empMetaByCode[normEmpCode(e.code || e.employee_id)] = e;
+  });
+
+  const refDate = new Date(yr, mo, 0); // วันสิ้นเดือนของงวด
+  const acc = {
+    salExec: 0, salProd: 0, salOffice: 0, salInternProd: 0, salInternOffice: 0,
+    otProd: 0, otOffice: 0, otInternProd: 0, otInternOffice: 0,
+    commProd: 0, commOffice: 0, commInternProd: 0, commInternOffice: 0,
+    otherExec: 0, otherProd: 0, otherOffice: 0, otherInternProd: 0,
+    roundingDiff: 0,
+    uniformDeposit: 0, sso: 0, pvd: 0,
+    deductAtt: 0, deductDamage: 0, deductGoods: 0,
+    empCount: emps.length
+  };
+
+  emps.forEach(e => {
+    const meta = empMetaByCode[normEmpCode(e.code)] || {};
+    const dept = String(meta.department || e.position || '');
+    const isExec = dept.indexOf('Executive') !== -1 || dept.indexOf('บริหาร') !== -1;
+    const isOffice = !isExec && (dept.indexOf('บัญชี') !== -1 || dept.indexOf('ขาย') !== -1 || dept.indexOf('IT') !== -1 || dept.indexOf('ออฟฟิศ') !== -1);
+
+    let isIntern = false;
+    const hireIso = e.hire_date_iso || repoNormalizeDate(meta.hire_date || '');
+    if (hireIso && /^\d{4}-\d{2}-\d{2}$/.test(hireIso)) {
+      const h = new Date(hireIso + 'T00:00:00');
+      let mDiff = (refDate.getFullYear() - h.getFullYear()) * 12 + (refDate.getMonth() - h.getMonth());
+      if (refDate.getDate() < h.getDate()) mDiff--;
+      if (mDiff <= 3) isIntern = true;
+    }
+
+    const commDil = (Number(e.commission) || 0) + (Number(e.measurement) || 0) + (Number(e.frame_bonus) || 0) + (Number(e.diligence) || 0);
+    const otherInc = (Number(e.position_allowance) || 0) + (Number(e.phone_allowance) || 0);
+
+    if (isExec) {
+      acc.salExec += Number(e.base_salary) || 0;
+      acc.otherExec += otherInc;
+    } else if (isOffice) {
+      if (isIntern) {
+        acc.salInternOffice += Number(e.base_salary) || 0;
+        acc.otInternOffice += Number(e.ot_baht) || 0;
+        acc.commInternOffice += commDil;
+      } else {
+        acc.salOffice += Number(e.base_salary) || 0;
+        acc.otOffice += Number(e.ot_baht) || 0;
+        acc.commOffice += commDil;
+        acc.otherOffice += otherInc;
+      }
+    } else {
+      if (isIntern) {
+        acc.salInternProd += Number(e.base_salary) || 0;
+        acc.otInternProd += Number(e.ot_baht) || 0;
+        acc.commInternProd += commDil;
+        acc.otherInternProd += otherInc;
+      } else {
+        acc.salProd += Number(e.base_salary) || 0;
+        acc.otProd += Number(e.ot_baht) || 0;
+        acc.commProd += commDil;
+        acc.otherProd += otherInc;
+      }
+    }
+
+    acc.uniformDeposit += Number(e.deduct_uniform) || 0;
+    acc.sso += Number(e.sso) || 0;
+    acc.pvd += Number(e.deduct_pvd) || 0;
+    acc.deductAtt += (Number(e.deduct_absent) || 0) + (Number(e.deduct_late) || 0) + (Number(e.deduct_other) || 0) + (Number(e.deduct_forbid_absent) || 0);
+    acc.deductDamage += Number(e.deduct_damage) || 0;
+    acc.deductGoods += Number(e.deduct_goods) || 0;
+
+    const exactSum = (Number(e.base_salary) || 0) + (Number(e.ot_baht) || 0) + commDil + otherInc +
+      (Number(e.deduct_absent) || 0) + (Number(e.deduct_late) || 0) + (Number(e.deduct_pvd) || 0) +
+      (Number(e.deduct_uniform) || 0) + (Number(e.deduct_goods) || 0) + (Number(e.deduct_damage) || 0) +
+      (Number(e.deduct_other) || 0) + (Number(e.deduct_forbid_absent) || 0) + (Number(e.sso) || 0) + (Number(e.tax) || 0);
+    acc.roundingDiff += (Number(e.net_pay) || 0) - exactSum;
+  });
+
+  const lastRow = Math.min(sumSheet.getLastRow(), 35);
+  const labels = sumSheet.getRange(1, 1, lastRow, 1).getValues();
+  const labelRules = [
+    ['เงินเดือนบริหาร', acc.salExec],
+    ['เงินเดือน-ทีมผลิต', acc.salProd],
+    ['เงินเดือนออฟฟิศ', acc.salOffice],
+    ['เงินเดือนฝึกงาน-ทีมผลิต', acc.salInternProd],
+    ['เงินเดือนฝึกงาน-ออฟฟิศ', acc.salInternOffice],
+    ['ค่าล่วงเวลา-ทีมผลิต', acc.otProd],
+    ['ค่าล่วงเวลาออฟฟิศ', acc.otOffice],
+    ['ค่าล่วงเวลาฝึกงาน-ทีมผลิต', acc.otInternProd],
+    ['ค่าล่วงเวลาฝึกงานออฟฟิศ', acc.otInternOffice],
+    ['ค่าคอมต่างๆ +เบี้ยขยัน-ทีมผลิต', acc.commProd],
+    ['ค่าคอมต่างๆ +เบี้ยขยัน-ออฟฟิศ', acc.commOffice],
+    ['ค่าคอมต่างๆ +เบี้ยขยัน ฝึกงาน-ทีมผลิต', acc.commInternProd],
+    ['ค่าคอมต่างๆ +เบี้ยขยัน ฝึกงาน-ออฟฟิศ', acc.commInternOffice],
+    ['รายได้อื่นๆ -ทีมบริหาร', acc.otherExec],
+    ['รายได้อื่นๆ -ทีมผลิต', acc.otherProd],
+    ['รายได้อื่นๆ ออฟฟิศ', acc.otherOffice],
+    ['รายได้อื่นๆ  ฝึกงาน -ทีมผลิต', acc.otherInternProd],
+    ['ปัดเศษสตางค์', acc.roundingDiff],
+    ['ค่าชุดยูนิฟอร์ม มัดจำ', acc.uniformDeposit],
+    ['ค่าประกันสังคม', acc.sso],
+    ['กองทุนสำรองเลี้ยงชีพ', acc.pvd],
+    ['หักขาดลามาสายไม่สแกนนิ้ว', acc.deductAtt],
+    ['หักค่าเสียหายจากการทำงาน', acc.deductDamage],
+    ['หักค่าสินค้า', acc.deductGoods],
+    ['จำนวนพนักงาน', acc.empCount]
+  ];
+
+  let updatedRows = 0;
+  for (let r = 1; r < labels.length; r++) {
+    const txt = String(labels[r][0] || '').trim();
+    if (!txt) continue;
+    for (let j = 0; j < labelRules.length; j++) {
+      if (txt.indexOf(labelRules[j][0]) !== -1) {
+        sumSheet.getRange(r + 1, targetCol).setValue(round2(labelRules[j][1]));
+        updatedRows++;
+        break;
+      }
+    }
+  }
+  SpreadsheetApp.flush();
+  repoAppendAuditLog(actor || 'admin', 'SYNC_ACCOUNTING_SUMMARY', 'สรุปบัญชีเงินเดือน', ym, null, { updatedRows: updatedRows, empCount: acc.empCount }, 'อัปเดตสรุปบัญชีเงินเดือนอัตโนมัติ');
+  return { ok: true, updatedRows: updatedRows, month: ym };
 }

@@ -911,6 +911,9 @@ function setPeriodStatus(yearMonth, newStatus, actor, reason) {
   repoUpdateRow(SHEETS.PAYROLL_PERIOD, period._rowIndex, updates);
   repoAppendAuditLog(actor || 'admin', 'CHANGE_PERIOD_STATUS', SHEETS.PAYROLL_PERIOD, yearMonth,
     { status: period.status }, updates, reason || ('เปลี่ยนสถานะงวดเป็น ' + st));
+  if (st === 'locked' && typeof applyUniformDepositsOnLock === 'function') {
+    applyUniformDepositsOnLock(yearMonth, actor);
+  }
   return Object.assign({}, period, updates);
 }
 

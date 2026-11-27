@@ -16,7 +16,8 @@ const SHEETS = {
   HOLIDAYS: 'Holidays',
   FRAME_FINDING: 'Frame_Finding',
   SITE_MEASURE: 'Site_Measure',
-  COMMISSION_MONTHLY: 'Commission_Monthly'
+  COMMISSION_MONTHLY: 'Commission_Monthly',
+  PAYROLL_MONTHLY_LOG: 'Payroll_Monthly_Log'
 };
 
 const TIMEZONE = 'Asia/Bangkok';

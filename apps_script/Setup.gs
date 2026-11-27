@@ -8,7 +8,8 @@ const DB_SCHEMA = {
   Employees: [
     'employee_id', 'code', 'name', 'nickname', 'department', 'position',
     'fingerprint_id', 'line_user_id', 'role', 'supervisor_id', 'status', 'hire_date', 'vacation_quota',
-    'title', 'national_id', 'email', 'phone', 'address', 'bank_name', 'bank_account', 'pvd_join_date', 'pvd_rate'
+    'title', 'national_id', 'email', 'phone', 'address', 'bank_name', 'bank_account', 'pvd_join_date', 'pvd_rate',
+    'uniform_deposit_paid', 'uniform_monthly_deduct'
   ],
   Attendance_Daily: [
     'work_date', 'employee_id', 'code', 'name', 'first_in', 'last_out',
@@ -62,6 +63,11 @@ const DB_SCHEMA = {
     'rate_full_pct', 'rate_half_pct', 'sales_kpi_deduct', 'prod_kpi_deduct',
     'sales_pool', 'prod_pool', 'sales_hours_total', 'prod_hours_total',
     'allocations_json', 'updated_by', 'updated_at'
+  ],
+  Payroll_Monthly_Log: [
+    'year_month', 'employee_id', 'code', 'name', 'work_days', 'late_min', 'absent_min', 'leave_hours',
+    'diligence_eligible', 'diligence_streak', 'diligence_amount', 'missing_scan_count',
+    'forbid_absent_days', 'forbid_absent_deduct', 'uniform_deducted', 'uniform_applied', 'updated_at'
   ]
 };
 
@@ -165,7 +171,7 @@ function ensureVacationQuotaColumn() {
  */
 function ensureBonusSheets() {
   const ss = repoGetMainDb();
-  [SHEETS.FRAME_FINDING, SHEETS.SITE_MEASURE, SHEETS.COMMISSION_MONTHLY].forEach(name => {
+  [SHEETS.FRAME_FINDING, SHEETS.SITE_MEASURE, SHEETS.COMMISSION_MONTHLY, SHEETS.PAYROLL_MONTHLY_LOG].forEach(name => {
     const headers = DB_SCHEMA[name];
     let sheet = ss.getSheetByName(name);
     if (!sheet) sheet = ss.insertSheet(name);
