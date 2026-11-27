@@ -258,12 +258,37 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
 
     const lastRow = calcSheet.getLastRow();
     if (lastRow >= 2) {
+      const empByCode = {};
+      repoReadAll(SHEETS.EMPLOYEES).rows.forEach(e => {
+        const k = normEmpCode(e.code || e.employee_id);
+        if (k) empByCode[k] = e;
+      });
+
       const codes = calcSheet.getRange(2, 1, lastRow - 1, 1).getValues();
-      const statsGrid = calcSheet.getRange(2, 7, lastRow - 1, 5).getValues(); // G-K
+      const profileGrid = calcSheet.getRange(2, 2, lastRow - 1, 4).getValues(); // B-E: name, nickname, position, hire_date
+      const statsGrid = calcSheet.getRange(2, 7, lastRow - 1, 5).getValues();   // G-K
       const diligenceCol = calcSheet.getRange(2, 16, lastRow - 1, 1).getValues(); // P
+      const pvdCol = calcSheet.getRange(2, 21, lastRow - 1, 1).getValues();       // U: % PVD
+      const bankGrid = calcSheet.getRange(2, 32, lastRow - 1, 2).getValues();     // AF-AG: bank, account
 
       for (let i = 0; i < codes.length; i++) {
         const code = normEmpCode(codes[i][0]);
+        const emp = empByCode[code];
+        if (emp) {
+          if (emp.name) profileGrid[i][0] = emp.name;
+          if (emp.nickname) profileGrid[i][1] = emp.nickname;
+          if (emp.position) profileGrid[i][2] = emp.position;
+          if (emp.hire_date) profileGrid[i][3] = repoNormalizeDate(emp.hire_date);
+          if (emp.pvd_rate !== undefined && String(emp.pvd_rate).trim() !== '') {
+            const rawPvd = Number(String(emp.pvd_rate).replace('%', '').trim());
+            if (!isNaN(rawPvd)) {
+              pvdCol[i][0] = rawPvd > 1 ? Math.round(rawPvd * 100) / 10000 : rawPvd;
+            }
+          }
+          if (emp.bank_name) bankGrid[i][0] = String(emp.bank_name);
+          if (emp.bank_account) bankGrid[i][1] = String(emp.bank_account);
+        }
+
         const st = byEmp[code];
         if (!st) continue;
         statsGrid[i] = [
@@ -278,8 +303,11 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
         else if (!Number(diligenceCol[i][0])) diligenceCol[i][0] = 500;
         calcUpdated++;
       }
+      calcSheet.getRange(2, 2, lastRow - 1, 4).setValues(profileGrid);
       calcSheet.getRange(2, 7, lastRow - 1, 5).setValues(statsGrid);
       calcSheet.getRange(2, 16, lastRow - 1, 1).setValues(diligenceCol);
+      calcSheet.getRange(2, 21, lastRow - 1, 1).setNumberFormat('0.0%').setValues(pvdCol);
+      calcSheet.getRange(2, 32, lastRow - 1, 2).setNumberFormat('@').setValues(bankGrid);
     }
   }
 
