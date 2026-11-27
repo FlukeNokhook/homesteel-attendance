@@ -54,6 +54,13 @@ const DB_SCHEMA = {
   Site_Measure: [
     'record_id', 'year_month', 'bill_no', 'customer_name', 'sales_amount', 'total_amount',
     'participants_json', 'participants_summary', 'note', 'created_by', 'created_at'
+  ],
+  Commission_Monthly: [
+    'year_month', 'gross_sales', 'prev_year_sales', 'capital', 'credit_note', 'incident_case', 'supercoil',
+    'net_sales', 'pv_project_sales', 'front_store_sales', 'extra_prod_sales',
+    'rate_full_pct', 'rate_half_pct', 'sales_kpi_deduct', 'prod_kpi_deduct',
+    'sales_pool', 'prod_pool', 'sales_hours_total', 'prod_hours_total',
+    'allocations_json', 'updated_by', 'updated_at'
   ]
 };
 
@@ -157,7 +164,7 @@ function ensureVacationQuotaColumn() {
  */
 function ensureBonusSheets() {
   const ss = repoGetMainDb();
-  [SHEETS.FRAME_FINDING, SHEETS.SITE_MEASURE].forEach(name => {
+  [SHEETS.FRAME_FINDING, SHEETS.SITE_MEASURE, SHEETS.COMMISSION_MONTHLY].forEach(name => {
     const headers = DB_SCHEMA[name];
     let sheet = ss.getSheetByName(name);
     if (!sheet) sheet = ss.insertSheet(name);

@@ -419,6 +419,7 @@
           <button class="subtab-btn active" data-psub="summary" onclick="switchPayrollSub('summary')">💵 สรุปเงินเดือน & สลิป</button>
           <button class="subtab-btn" data-psub="frame" onclick="switchPayrollSub('frame')">🏗️ ค่าหาโครง <span id="frameCountBadge" class="pill pill-blue" style="padding:1px 7px; font-size:11px;">0</span></button>
           <button class="subtab-btn" data-psub="measure" onclick="switchPayrollSub('measure')">📏 ค่าวัดหน้างาน <span id="measureCountBadge" class="pill pill-blue" style="padding:1px 7px; font-size:11px;">0</span></button>
+          <button class="subtab-btn" data-psub="commission" onclick="switchPayrollSub('commission')">💎 ค่าคอมมิชชั่น</button>
         </div>
 
         <!-- Sub-tab 1: Summary & Pay Slips -->
@@ -533,6 +534,81 @@
             </div>
             <div id="measureSummaryChips" class="chip-row"></div>
             <div id="measureTableWrap"></div>
+          </div>
+        </div>
+
+        <!-- Sub-tab 4: Commission (ค่าคอมมิชชั่น) -->
+        <div id="psub-commission" class="hidden">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3 class="card-title">💎 คำนวณค่าคอมมิชชั่นประจำเดือน</h3>
+                <div class="rate-bar">
+                  <span>เทียบยอดขายก่อนหักกับปีที่แล้ว:</span>
+                  <span class="rate-pill">มากกว่าปีก่อน → 0.15% / 0.075%</span>
+                  <span class="rate-pill">น้อยกว่าหรือเท่ากับ → 0.10% / 0.05%</span>
+                  <span class="rate-pill">ชม. = ปกติ + ลา (ไม่รวม OT/ขาด)</span>
+                </div>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="loadCommission()">🔄 โหลดข้อมูล</button>
+            </div>
+
+            <div class="pay-cols" style="margin-bottom:16px;">
+              <!-- Left: Inputs -->
+              <div class="pay-box" style="background:#f8fafc;">
+                <div class="pay-box-head">
+                  <div class="pay-box-title" style="color:var(--text);"><span>📝 ยอดขายประจำเดือน</span><span id="commSavedTag" class="card-sub"></span></div>
+                </div>
+                <div class="pay-field"><label><b>ยอดขายประจำเดือน (ก่อนหัก) *</b></label><input id="cmGross" type="number" step="0.01" min="0" value="0" oninput="recalcCommissionLive()" /></div>
+                <div class="pay-field"><label>ยอดขายเดือนเดียวกันปีที่แล้ว</label><input id="cmPrevYear" type="number" step="0.01" min="0" value="0" oninput="recalcCommissionLive()" /></div>
+                <div style="border-top:1px dashed var(--border); margin:8px 0;"></div>
+                <div class="pay-field"><label class="card-sub">หัก ทุน (Capital)</label><input id="cmCapital" type="number" step="0.01" min="0" value="100000" oninput="recalcCommissionLive()" /></div>
+                <div class="pay-field"><label class="card-sub">หัก Supercoil</label><input id="cmSupercoil" type="number" step="0.01" min="0" value="18000" oninput="recalcCommissionLive()" /></div>
+                <div class="pay-field"><label class="card-sub">หัก ลดหนี้ (Credit Note)</label><input id="cmCredit" type="number" step="0.01" min="0" value="0" oninput="recalcCommissionLive()" /></div>
+                <div class="pay-field"><label class="card-sub">หัก Incident Case</label><input id="cmIncident" type="number" step="0.01" min="0" value="0" oninput="recalcCommissionLive()" /></div>
+                <div style="border-top:1px dashed var(--border); margin:8px 0;"></div>
+                <div class="pay-field"><label>ยอดขายงาน PV / โครงการ (ครึ่งอัตรา)</label><input id="cmPv" type="number" step="0.01" min="0" value="0" oninput="recalcCommissionLive()" /></div>
+                <div class="pay-field"><label>ยอด Extra (เฉพาะผลิตและจัดส่ง)</label><input id="cmExtraProd" type="number" step="0.01" min="0" value="0" oninput="recalcCommissionLive()" /></div>
+              </div>
+
+              <!-- Right: Live Summary -->
+              <div class="pay-box" style="background:#eff6ff; border-color:#bfdbfe;">
+                <div class="pay-box-head">
+                  <div class="pay-box-title" style="color:#1e3a8a;"><span>📊 สรุปคำนวณสด</span><span id="cmRateBadge" class="pill pill-blue">เรท 0.10% / 0.05%</span></div>
+                </div>
+                <div class="pay-field"><label><b>ยอดขายสุทธิ (Net Sales)</b></label><div id="cmNetVal" class="pay-auto-val" style="color:#0f172a; font-size:14px;">0.00</div></div>
+                <div class="pay-field"><label class="card-sub">ยอดขายหน้าร้าน (เต็มอัตรา)</label><div id="cmFrontVal" class="pay-auto-val">0.00</div></div>
+                <div class="pay-field"><label class="card-sub">งาน PV / โครงการ (ครึ่งอัตรา)</label><div id="cmPvVal" class="pay-auto-val">0.00</div></div>
+                <div style="border-top:1px dashed #93c5fd; margin:10px 0;"></div>
+                <div class="pay-field"><label class="card-sub">KPI หักค่าคอม (พนักงานขาย)</label><input id="cmSalesKpi" type="number" step="0.01" min="0" value="0" oninput="recalcCommissionLive()" /></div>
+                <div class="pay-field"><label><b>🛍️ Pool พนักงานขาย</b></label><div id="cmSalesPool" class="pay-auto-val" style="color:#15803d; font-size:14px;">0.00 ฿</div></div>
+                <div style="border-top:1px dashed #93c5fd; margin:10px 0;"></div>
+                <div class="pay-field"><label class="card-sub">KPI หักค่าคอม (ผลิตและจัดส่ง)</label><input id="cmProdKpi" type="number" step="0.01" min="0" value="0" oninput="recalcCommissionLive()" /></div>
+                <div class="pay-field"><label><b>🏭 Pool ผลิตและจัดส่ง</b></label><div id="cmProdPool" class="pay-auto-val" style="color:#15803d; font-size:14px;">0.00 ฿</div></div>
+              </div>
+            </div>
+
+            <!-- Team Allocations -->
+            <div class="pay-cols" style="margin-bottom:14px;">
+              <div class="pay-box" style="background:#fff;">
+                <div class="pay-box-head">
+                  <div class="pay-box-title" style="color:var(--text);"><span>🛍️ ทีมพนักงานขาย</span><span id="cmSalesRateHr" class="card-sub">0.00 บ./ชม.</span></div>
+                </div>
+                <div id="cmSalesTable"></div>
+                <div id="cmSalesAddWrap" style="margin-top:8px;"></div>
+              </div>
+              <div class="pay-box" style="background:#fff;">
+                <div class="pay-box-head">
+                  <div class="pay-box-title" style="color:var(--text);"><span>🏭 ทีมผลิตและจัดส่ง</span><span id="cmProdRateHr" class="card-sub">0.00 บ./ชม.</span></div>
+                </div>
+                <div id="cmProdTable"></div>
+                <div id="cmProdAddWrap" style="margin-top:8px;"></div>
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+              <button class="btn btn-primary" onclick="saveCommission()">💾 บันทึกค่าคอม & ส่งเข้า Calculation</button>
+            </div>
           </div>
         </div>
       </section>
@@ -725,7 +801,7 @@
         renderPending(res.pendingVacations, res.pendingOTs, res.unackLeaves);
         if (STATE.currentTab === 'matrix') loadMatrix();
         if (STATE.currentTab === 'person') loadPerson();
-        if (STATE.currentTab === 'payroll') { loadPayroll(); loadBonuses(); }
+        if (STATE.currentTab === 'payroll') { loadPayroll(); loadBonuses(); if (!$('psub-commission').classList.contains('hidden')) loadCommission(); }
       } catch (err) {
         if (fromLogin) {
           sessionStorage.removeItem('hs_admin');
@@ -1967,8 +2043,9 @@
 
     function switchPayrollSub(sub) {
       document.querySelectorAll('.subtab-btn[data-psub]').forEach(b => b.classList.toggle('active', b.dataset.psub === sub));
-      ['summary', 'frame', 'measure'].forEach(s => $('psub-' + s).classList.toggle('hidden', s !== sub));
+      ['summary', 'frame', 'measure', 'commission'].forEach(s => $('psub-' + s).classList.toggle('hidden', s !== sub));
       if (sub === 'summary') loadPayroll();
+      else if (sub === 'commission') loadCommission();
       else { populateBonusEmpControls(); loadBonuses(); }
     }
 
@@ -2383,6 +2460,143 @@
         BONUS_DATA = res.data || BONUS_DATA;
         renderBonuses();
         toast('ลบรายการค่าวัดหน้างานเรียบร้อย' + (res.synced ? ' และอัปเดตเข้า Calculation แล้ว' : ''), 'success');
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    /* ================= Monthly Commission (ค่าคอมมิชชั่น) ================= */
+    let COMM_MEMBERS = [];
+    let COMM_META = null;
+
+    async function loadCommission() {
+      try {
+        const res = await call('adminGetMonthCommission', $('monthPicker').value);
+        COMM_META = res;
+        COMM_MEMBERS = (res.employees || []).map(e => Object.assign({}, e));
+        const sv = res.saved;
+        $('cmGross').value = sv ? sv.gross_sales : 0;
+        $('cmPrevYear').value = sv ? sv.prev_year_sales : (res.prevYearAutoSales || 0);
+        $('cmCapital').value = sv ? sv.capital : 100000;
+        $('cmSupercoil').value = sv ? sv.supercoil : 18000;
+        $('cmCredit').value = sv ? sv.credit_note : 0;
+        $('cmIncident').value = sv ? sv.incident_case : 0;
+        $('cmPv').value = sv ? sv.pv_project_sales : 0;
+        $('cmExtraProd').value = sv ? sv.extra_prod_sales : 0;
+        $('cmSalesKpi').value = sv ? sv.sales_kpi_deduct : 0;
+        $('cmProdKpi').value = sv ? sv.prod_kpi_deduct : 0;
+        $('commSavedTag').textContent = sv && sv.updated_at ? `บันทึกล่าสุด ${sv.updated_at}` : 'ยังไม่เคยบันทึกเดือนนี้';
+        recalcCommissionLive();
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
+    function recalcCommissionLive() {
+      const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
+      const gross = Number($('cmGross').value) || 0;
+      const prevYear = Number($('cmPrevYear').value) || 0;
+      const capital = Number($('cmCapital').value) || 0;
+      const supercoil = Number($('cmSupercoil').value) || 0;
+      const credit = Number($('cmCredit').value) || 0;
+      const incident = Number($('cmIncident').value) || 0;
+      const pv = Number($('cmPv').value) || 0;
+      const extraProd = Number($('cmExtraProd').value) || 0;
+      const salesKpi = Math.abs(Number($('cmSalesKpi').value) || 0);
+      const prodKpi = Math.abs(Number($('cmProdKpi').value) || 0);
+
+      const net = r2(gross - (capital + credit + incident + supercoil));
+      const front = r2(net - pv);
+      const isHigher = (prevYear > 0 && gross > prevYear);
+      const rateFull = isHigher ? 0.15 : 0.10;
+      const rateHalf = isHigher ? 0.075 : 0.05;
+
+      const salesPool = Math.max(0, r2(r2(front * (rateFull / 100)) + r2(pv * (rateHalf / 100)) - salesKpi));
+      const prodPool = Math.max(0, r2(r2((front + extraProd) * (rateFull / 100)) + r2(pv * (rateHalf / 100)) - prodKpi));
+
+      const badge = $('cmRateBadge');
+      if (isHigher) {
+        const pctDiff = r2(((gross - prevYear) / prevYear) * 100);
+        badge.className = 'pill pill-green';
+        badge.textContent = `สูงกว่าปีก่อน +${pctDiff}% • เรท 0.15% / 0.075%`;
+      } else {
+        badge.className = 'pill pill-blue';
+        badge.textContent = prevYear > 0 ? 'ไม่เกินปีก่อน • เรท 0.10% / 0.05%' : 'เรทปกติ • 0.10% / 0.05%';
+      }
+
+      $('cmNetVal').textContent = fmtBaht(net);
+      $('cmFrontVal').textContent = fmtBaht(front);
+      $('cmPvVal').textContent = fmtBaht(pv);
+      $('cmSalesPool').textContent = fmtBaht(salesPool) + ' ฿';
+      $('cmProdPool').textContent = fmtBaht(prodPool) + ' ฿';
+
+      renderCommissionTeam('sales', salesPool, 'cmSalesTable', 'cmSalesRateHr', 'cmSalesAddWrap');
+      renderCommissionTeam('prod', prodPool, 'cmProdTable', 'cmProdRateHr', 'cmProdAddWrap');
+    }
+
+    function renderCommissionTeam(teamKey, pool, tableId, rateId, addWrapId) {
+      const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
+      const members = COMM_MEMBERS.filter(m => m.team === teamKey);
+      const totalHrs = r2(members.filter(m => m.included && Number(m.hours) > 0).reduce((s, m) => s + Number(m.hours || 0), 0));
+      const perHr = totalHrs > 0 ? pool / totalHrs : 0;
+
+      $(rateId).textContent = `${fmtBaht(pool)} ฿ ÷ ${totalHrs} ชม. = ${perHr.toFixed(2)} บ./ชม.`;
+
+      if (!members.length) {
+        $(tableId).innerHTML = emptyState('👥', 'ยังไม่มีพนักงานในทีมนี้');
+      } else {
+        $(tableId).innerHTML = `<div class="table-wrap"><table>
+          <thead><tr><th style="width:30px;">รับ</th><th>ชื่อ-สกุล (ชื่อเล่น)</th><th class="num" style="width:86px;">ชม.ทำงาน</th><th class="num" style="width:95px;">ค่าคอม (บ.)</th><th style="width:28px;"></th></tr></thead>
+          <tbody>${members.map(m => {
+            const idx = COMM_MEMBERS.findIndex(x => x.employee_id === m.employee_id);
+            const amt = (m.included && Number(m.hours) > 0 && totalHrs > 0) ? r2(perHr * Number(m.hours)) : 0;
+            return `<tr style="${m.included ? '' : 'opacity:.45;'}">
+              <td><input type="checkbox" ${m.included ? 'checked' : ''} onchange="COMM_MEMBERS[${idx}].included=this.checked; recalcCommissionLive()" /></td>
+              <td><b>${esc(m.name)}</b>${m.nickname && m.nickname !== m.name ? ` <span class="card-sub">(${esc(m.nickname)})</span>` : ''}</td>
+              <td class="num"><input type="number" step="0.5" min="0" value="${m.hours}" style="width:72px; padding:4px 6px; border:1px solid var(--border); border-radius:6px; text-align:right;" oninput="COMM_MEMBERS[${idx}].hours=Number(this.value)||0; recalcCommissionLive()" /></td>
+              <td class="num" style="font-weight:700; color:${amt > 0 ? '#15803d' : 'var(--muted)'};">${fmtBaht(amt)}</td>
+              <td><button type="button" class="part-share-rm" title="นำออกจากทีม" onclick="COMM_MEMBERS[${idx}].team='none'; COMM_MEMBERS[${idx}].included=false; recalcCommissionLive()">×</button></td>
+            </tr>`;
+          }).join('')}</tbody></table></div>`;
+      }
+
+      const others = COMM_MEMBERS.filter(m => m.team !== teamKey);
+      $(addWrapId).innerHTML = others.length ? `<select class="select" style="width:auto; min-width:185px; padding:5px 10px; font-size:12.5px;" onchange="if(this.value){assignCommTeam(this.value,'${teamKey}'); this.value='';}">
+        <option value="">+ เพิ่มพนักงานเข้าทีมนี้...</option>
+        ${others.map(m => `<option value="${esc(m.employee_id)}">${esc(m.nickname || m.name)} (${esc(m.name)})</option>`).join('')}
+      </select>` : '';
+    }
+
+    function assignCommTeam(empId, teamKey) {
+      const m = COMM_MEMBERS.find(x => String(x.employee_id) === String(empId));
+      if (!m) return;
+      m.team = teamKey;
+      m.included = true;
+      recalcCommissionLive();
+    }
+
+    async function saveCommission() {
+      try {
+        const res = await call('adminSaveMonthCommission', {
+          year_month: $('monthPicker').value,
+          gross_sales: Number($('cmGross').value) || 0,
+          prev_year_sales: Number($('cmPrevYear').value) || 0,
+          capital: Number($('cmCapital').value) || 0,
+          supercoil: Number($('cmSupercoil').value) || 0,
+          credit_note: Number($('cmCredit').value) || 0,
+          incident_case: Number($('cmIncident').value) || 0,
+          pv_project_sales: Number($('cmPv').value) || 0,
+          extra_prod_sales: Number($('cmExtraProd').value) || 0,
+          sales_kpi_deduct: Number($('cmSalesKpi').value) || 0,
+          prod_kpi_deduct: Number($('cmProdKpi').value) || 0,
+          members: COMM_MEMBERS.map(m => ({
+            employee_id: m.employee_id, code: m.code, name: m.name, nickname: m.nickname,
+            team: m.team, included: !!m.included, hours: Number(m.hours) || 0
+          }))
+        });
+        toast('บันทึกค่าคอมมิชชั่นเรียบร้อย' + (res.synced ? ' และอัปเดตเข้าชีต Calculation แล้ว' : ''), 'success');
+        if (res.data) {
+          COMM_META = res.data;
+          COMM_MEMBERS = (res.data.employees || []).map(e => Object.assign({}, e));
+          if (res.data.saved && res.data.saved.updated_at) $('commSavedTag').textContent = `บันทึกล่าสุด ${res.data.saved.updated_at}`;
+          recalcCommissionLive();
+        }
       } catch (err) { toast(err.message, 'error'); }
     }
   </script>

@@ -283,8 +283,9 @@ function syncTimeClockToPayrollSheet(yearMonth, actor) {
     }
   }
 
-  // ซิงก์ยอดรวม ค่าวัดหน้างาน (N) และ ค่าหาโครง (O) ของเดือนนี้เข้าชีต Calculation ด้วย
+  // ซิงก์ยอดรวม ค่าวัดหน้างาน (N), ค่าหาโครง (O), และ ค่าคอมมิชชั่น (M) ของเดือนนี้เข้าชีต Calculation ด้วย
   syncBonusTotalsToCalculation(yearMonth);
+  syncCommissionToCalculation(yearMonth);
 
   repoAppendAuditLog(actor || 'admin', 'SYNC_PAYROLL', 'Calculation', yearMonth,
     null, { timeClockRows: tcData.length - 1, calcUpdated: calcUpdated, calcAdded: calcAdded }, 'ส่งข้อมูลเวลาเข้า Calculation + Time Clock');
@@ -758,4 +759,219 @@ function deleteSiteMeasure(recordId, actor) {
   repoAppendAuditLog(actor || 'admin', 'DELETE_SITE_MEASURE', SHEETS.SITE_MEASURE, recordId, target, null, 'ลบรายการค่าวัดหน้างานจาก Dashboard');
   const synced = syncBonusTotalsToCalculation(ym);
   return { ok: true, synced: synced, data: getMonthBonusData(ym) };
+}
+
+/* ================= Monthly Commission (ค่าคอมมิชชั่น) ================= */
+
+function defaultCommissionTeam(dept) {
+  const d = String(dept || '').trim();
+  if (d.indexOf('ขาย') !== -1) return 'sales';
+  if (d.indexOf('ผลิต') !== -1 || d.indexOf('จัดส่ง') !== -1 || d.indexOf('วัดหน้างาน') !== -1) return 'prod';
+  return 'none';
+}
+
+function getMonthCommissionData(yearMonth) {
+  ensureBonusSheets();
+  const ym = String(yearMonth || '').trim();
+  const [yNum, mStr] = ym.split('-');
+  const prevYm = (Number(yNum) - 1) + '-' + (mStr || '01');
+
+  const commRows = repoReadAll(SHEETS.COMMISSION_MONTHLY).rows;
+  const savedRow = commRows.find(r => String(r.year_month || '').trim() === ym) || null;
+  const prevRow = commRows.find(r => String(r.year_month || '').trim() === prevYm) || null;
+
+  // คำนวณชั่วโมงทำงานปกติ + วันลาที่ได้สิทธิ์ (ไม่รวม OT และไม่นับวันขาด) จาก Attendance_Daily
+  const hoursByEmp = {};
+  repoReadAll(SHEETS.ATTENDANCE_DAILY).rows
+    .filter(r => String(r.work_date || '').indexOf(ym) === 0)
+    .forEach(r => {
+      const id = String(r.employee_id || '').trim();
+      const hrs = (Number(r.work_minutes || 0) / 60) + Number(r.leave_hours || 0);
+      hoursByEmp[id] = round2((hoursByEmp[id] || 0) + hrs);
+    });
+
+  let savedAllocs = null;
+  if (savedRow && savedRow.allocations_json) {
+    try { savedAllocs = JSON.parse(String(savedRow.allocations_json)); } catch (_) { savedAllocs = null; }
+  }
+  const savedAllocMap = {};
+  if (Array.isArray(savedAllocs)) {
+    savedAllocs.forEach(a => { savedAllocMap[String(a.employee_id)] = a; });
+  }
+
+  const emps = repoGetEmployees().filter(isActiveEmp).map(e => {
+    const id = String(e.employee_id);
+    const autoHrs = hoursByEmp[id] || 0;
+    const prev = savedAllocMap[id];
+    const team = prev ? prev.team : defaultCommissionTeam(e.department);
+    return {
+      employee_id: id,
+      code: String(e.code || id),
+      name: String(e.name || ''),
+      nickname: String(e.nickname || ''),
+      department: String(e.department || ''),
+      position: String(e.position || ''),
+      team: team,
+      included: prev ? !!prev.included : (team === 'sales' || team === 'prod'),
+      auto_hours: autoHrs,
+      hours: prev !== undefined && prev.hours !== undefined ? Number(prev.hours) : autoHrs,
+      amount: prev ? Number(prev.amount || 0) : 0
+    };
+  });
+
+  const saved = savedRow ? {
+    year_month: ym,
+    gross_sales: Number(savedRow.gross_sales) || 0,
+    prev_year_sales: Number(savedRow.prev_year_sales) || 0,
+    capital: savedRow.capital !== '' ? Number(savedRow.capital) : 100000,
+    credit_note: Number(savedRow.credit_note) || 0,
+    incident_case: Number(savedRow.incident_case) || 0,
+    supercoil: savedRow.supercoil !== '' ? Number(savedRow.supercoil) : 18000,
+    pv_project_sales: Number(savedRow.pv_project_sales) || 0,
+    extra_prod_sales: Number(savedRow.extra_prod_sales) || 0,
+    sales_kpi_deduct: Number(savedRow.sales_kpi_deduct) || 0,
+    prod_kpi_deduct: Number(savedRow.prod_kpi_deduct) || 0,
+    updated_at: String(savedRow.updated_at || '')
+  } : null;
+
+  return {
+    yearMonth: ym,
+    prevYearMonth: prevYm,
+    prevYearAutoSales: prevRow ? (Number(prevRow.gross_sales) || 0) : 0,
+    saved: saved,
+    employees: emps
+  };
+}
+
+function saveMonthCommission(payload, actor) {
+  ensureBonusSheets();
+  const ym = String(payload.year_month || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(ym)) throw new Error('กรุณาระบุเดือนให้ถูกต้องครับ');
+
+  const gross = Number(payload.gross_sales) || 0;
+  const prevYear = Number(payload.prev_year_sales) || 0;
+  const capital = Number(payload.capital) || 0;
+  const creditNote = Number(payload.credit_note) || 0;
+  const incident = Number(payload.incident_case) || 0;
+  const supercoil = Number(payload.supercoil) || 0;
+  const pvSales = Number(payload.pv_project_sales) || 0;
+  const extraProd = Number(payload.extra_prod_sales) || 0;
+  const salesKpi = Math.abs(Number(payload.sales_kpi_deduct) || 0);
+  const prodKpi = Math.abs(Number(payload.prod_kpi_deduct) || 0);
+
+  const netSales = round2(gross - (capital + creditNote + incident + supercoil));
+  const frontStore = round2(netSales - pvSales);
+  const isHigherYoY = (prevYear > 0 && gross > prevYear);
+  const rateFull = isHigherYoY ? 0.15 : 0.10;
+  const rateHalf = isHigherYoY ? 0.075 : 0.05;
+
+  const salesPool = Math.max(0, round2(
+    round2(frontStore * (rateFull / 100)) + round2(pvSales * (rateHalf / 100)) - salesKpi
+  ));
+  const prodPool = Math.max(0, round2(
+    round2((frontStore + extraProd) * (rateFull / 100)) + round2(pvSales * (rateHalf / 100)) - prodKpi
+  ));
+
+  const members = Array.isArray(payload.members) ? payload.members : [];
+  const salesMembers = members.filter(m => m.team === 'sales' && m.included && Number(m.hours) > 0);
+  const prodMembers = members.filter(m => m.team === 'prod' && m.included && Number(m.hours) > 0);
+  const salesHrsTotal = round2(salesMembers.reduce((s, m) => s + Number(m.hours || 0), 0));
+  const prodHrsTotal = round2(prodMembers.reduce((s, m) => s + Number(m.hours || 0), 0));
+
+  const empMap = {};
+  repoGetEmployees().forEach(e => { empMap[String(e.employee_id)] = e; });
+
+  const allocations = members.map(m => {
+    const e = empMap[String(m.employee_id)] || {};
+    const hrs = round2(Number(m.hours) || 0);
+    let amt = 0;
+    if (m.included && hrs > 0) {
+      if (m.team === 'sales' && salesHrsTotal > 0) amt = round2((salesPool / salesHrsTotal) * hrs);
+      else if (m.team === 'prod' && prodHrsTotal > 0) amt = round2((prodPool / prodHrsTotal) * hrs);
+    }
+    return {
+      employee_id: String(m.employee_id),
+      code: String(e.code || m.code || m.employee_id),
+      name: String(e.name || m.name || ''),
+      nickname: String(e.nickname || m.nickname || ''),
+      team: String(m.team || 'none'),
+      included: !!m.included,
+      hours: hrs,
+      amount: amt
+    };
+  });
+
+  const rec = {
+    year_month: ym,
+    gross_sales: round2(gross),
+    prev_year_sales: round2(prevYear),
+    capital: round2(capital),
+    credit_note: round2(creditNote),
+    incident_case: round2(incident),
+    supercoil: round2(supercoil),
+    net_sales: netSales,
+    pv_project_sales: round2(pvSales),
+    front_store_sales: frontStore,
+    extra_prod_sales: round2(extraProd),
+    rate_full_pct: rateFull,
+    rate_half_pct: rateHalf,
+    sales_kpi_deduct: round2(salesKpi),
+    prod_kpi_deduct: round2(prodKpi),
+    sales_pool: salesPool,
+    prod_pool: prodPool,
+    sales_hours_total: salesHrsTotal,
+    prod_hours_total: prodHrsTotal,
+    allocations_json: JSON.stringify(allocations),
+    updated_by: actor || 'admin',
+    updated_at: nowStr()
+  };
+
+  const existing = repoReadAll(SHEETS.COMMISSION_MONTHLY).rows.find(r => String(r.year_month || '').trim() === ym);
+  if (existing) {
+    repoUpdateRow(SHEETS.COMMISSION_MONTHLY, existing._rowIndex, rec);
+  } else {
+    repoAppendRow(SHEETS.COMMISSION_MONTHLY, rec);
+  }
+
+  repoAppendAuditLog(actor || 'admin', 'SAVE_COMMISSION', SHEETS.COMMISSION_MONTHLY, ym,
+    existing || null, { gross_sales: gross, prev_year_sales: prevYear, rate_full_pct: rateFull, sales_pool: salesPool, prod_pool: prodPool },
+    'บันทึกค่าคอมมิชชั่นประจำเดือนจาก Dashboard');
+
+  const synced = syncCommissionToCalculation(ym);
+  return { ok: true, synced: synced, data: getMonthCommissionData(ym) };
+}
+
+function syncCommissionToCalculation(yearMonth) {
+  try {
+    ensureBonusSheets();
+    const ym = String(yearMonth || '').trim();
+    if (!/^\d{4}-\d{2}$/.test(ym)) return false;
+    const cfg = getAppConfig();
+    if (!cfg.PAYROLL_SHEET_ID) return false;
+
+    const savedRow = repoReadAll(SHEETS.COMMISSION_MONTHLY).rows.find(r => String(r.year_month || '').trim() === ym);
+    if (!savedRow || !savedRow.allocations_json) return false;
+
+    const allocs = parseParticipantsJson(savedRow.allocations_json);
+    const commByCode = {};
+    allocs.forEach(a => {
+      const k = normEmpCode(a.code || a.employee_id);
+      if (k) commByCode[k] = round2((commByCode[k] || 0) + (Number(a.amount) || 0));
+    });
+
+    const payrollSs = getPayrollDb();
+    const calcSheet = payrollSs.getSheetByName('Calculation');
+    if (!calcSheet || calcSheet.getLastRow() < 2) return false;
+    if (String(calcSheet.getRange(1, 7).getValue()).indexOf('วันมาทำงาน') === -1) return false;
+
+    const lastRow = calcSheet.getLastRow();
+    const codes = calcSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    const commCol = codes.map(c => [commByCode[normEmpCode(c[0])] || 0]);
+    calcSheet.getRange(2, 13, lastRow - 1, 1).setValues(commCol);
+    SpreadsheetApp.flush();
+    return true;
+  } catch (e) {
+    Logger.log('syncCommissionToCalculation skip: ' + e.message);
+    return false;
+  }
 }

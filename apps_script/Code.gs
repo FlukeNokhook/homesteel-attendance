@@ -309,3 +309,13 @@ function adminDeleteSiteMeasure(adminSecret, recordId) {
   verifyAdminSecret(adminSecret);
   return withScriptLock(() => deleteSiteMeasure(recordId, 'ADMIN'));
 }
+
+function adminGetMonthCommission(adminSecret, yearMonth) {
+  verifyAdminSecret(adminSecret);
+  return getMonthCommissionData(yearMonth);
+}
+
+function adminSaveMonthCommission(adminSecret, payload) {
+  verifyAdminSecret(adminSecret);
+  return withScriptLock(() => saveMonthCommission(payload, 'ADMIN'));
+}
