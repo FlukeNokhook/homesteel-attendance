@@ -1194,12 +1194,22 @@
 
     async function openCorrectModal(workDate, empId, empName, firstIn, lastOut, note) {
       if (STATE.locked) { toast('งวดนี้ถูกล็อกแล้ว กรุณาปลดล็อกงวดก่อนแก้ไขครับ', 'error'); return; }
+      const rawNote = String(note || '');
+      const isOffsiteInit = rawNote.indexOf('[นอกสถานที่]') !== -1 || rawNote.indexOf('นอกสถานที่') !== -1 || rawNote.indexOf('ต่างจังหวัด') !== -1;
+      const cleanNote = rawNote.replace(/\[นอกสถานที่\]\s*/g, '').trim();
       const html = `
         <div class="grid-2">
           <div><label class="card-sub">เวลาเข้า (HH:mm)</label><input id="cIn" type="time" class="input" value="${esc(firstIn || '')}" /></div>
           <div><label class="card-sub">เวลาออก (HH:mm)</label><input id="cOut" type="time" class="input" value="${esc(lastOut || '')}" /></div>
         </div>
-        <div style="margin-bottom:10px;"><label class="card-sub">หมายเหตุ (แสดงในตาราง)</label><input id="cNote" class="input" value="${esc(note || '')}" placeholder="เช่น ลืมสแกนเข้า / ออกส่งของต่างจังหวัด" /></div>
+        <label style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; margin-bottom:10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; cursor:pointer;">
+          <input id="cOffsite" type="checkbox" ${isOffsiteInit ? 'checked' : ''} style="margin-top:3px; width:16px; height:16px; accent-color:var(--brand);" />
+          <div>
+            <div style="font-weight:600; font-size:13.5px; color:#1e3a8a;">ทำงานนอกสถานที่ / ต่างจังหวัด (ไม่หักค่าปรับลืมสแกน)</div>
+            <div class="card-sub" style="margin-top:2px;">หากติ๊กช่องนี้ ระบบจะ<b>ไม่หักค่าปรับลืมสแกนนิ้ว 10 บาท/ครั้ง</b> ในวันนี้ (ถ้าไม่ติ๊ก จะยังคงหัก 10 บาทอัตโนมัติแม้จะเติมเวลาให้แล้ว)</div>
+          </div>
+        </label>
+        <div style="margin-bottom:10px;"><label class="card-sub">หมายเหตุ (แสดงในตาราง)</label><input id="cNote" class="input" value="${esc(cleanNote)}" placeholder="เช่น ลืมสแกนออกตอนเที่ยง / ออกส่งของลูกค้า" /></div>
         <div><label class="card-sub">เหตุผลการแก้ไข (บันทึกลง Audit Log) *</label><input id="cReason" class="input" placeholder="ระบุเหตุผลการปรับแก้เวลา" /></div>`;
       const root = $('modalRoot');
       root.innerHTML = `<div class="modal-bg"><div class="modal">
@@ -1210,8 +1220,12 @@
       $('cSave').onclick = async () => {
         const reason = $('cReason').value.trim();
         if (!reason) { toast('กรุณาระบุเหตุผลการแก้ไขครับ', 'error'); return; }
+        let finalNote = $('cNote').value.trim();
+        if ($('cOffsite').checked) {
+          finalNote = '[นอกสถานที่]' + (finalNote ? ' ' + finalNote : '');
+        }
         try {
-          await call('adminCorrectAttendance', workDate, empId, $('cIn').value, $('cOut').value, $('cNote').value.trim(), reason);
+          await call('adminCorrectAttendance', workDate, empId, $('cIn').value, $('cOut').value, finalNote, reason);
           root.innerHTML = '';
           toast('บันทึกการแก้ไขเวลาและ Audit Log เรียบร้อย', 'success');
           loadInit();
