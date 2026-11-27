@@ -84,14 +84,18 @@
     .pill-gray { background: #f1f5f9; color: #64748b; }
 
     .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .stats.stats-row-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+    .stats.stats-row-5 .stat, .stats.stats-row-6 .stat { padding: 11px 13px; min-width: 0; }
+    .stats.stats-row-5 .stat .s-ico, .stats.stats-row-6 .stat .s-ico { width: 28px; height: 28px; font-size: 14px; margin-bottom: 6px; border-radius: 8px; }
+    .stats.stats-row-5 .stat .s-label, .stats.stats-row-6 .stat .s-label { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stats.stats-row-5 .stat .s-val, .stats.stats-row-6 .stat .s-val { font-size: clamp(14.5px, 1.35vw, 19px); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stats.stats-row-5 .stat .s-val small, .stats.stats-row-6 .stat .s-val small { font-size: clamp(10.5px, 0.9vw, 12px); }
     .stats.stats-row-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; max-width: 1180px; }
-    .stats.stats-row-6 .stat { padding: 12px 13px; min-width: 0; }
-    .stats.stats-row-6 .stat .s-ico { width: 30px; height: 30px; font-size: 15px; margin-bottom: 7px; border-radius: 8px; }
-    .stats.stats-row-6 .stat .s-label { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .stats.stats-row-6 .stat .s-val { font-size: clamp(15px, 1.45vw, 20px); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .stats.stats-row-6 .stat .s-val small { font-size: clamp(10.5px, 0.95vw, 12.5px); }
     .stats.stats-row-6 .stat .s-hint { font-size: 10.5px; margin-top: 5px; }
-    @media (max-width: 640px) { .stats.stats-row-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 640px) { .stats.stats-row-5, .stats.stats-row-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+    .pay-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .pay-toolbar-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
     .exc-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
     .exc-chip { border: 1px solid var(--border); background: #fff; color: var(--text-2); padding: 5px 11px; border-radius: 99px; font-size: 12.5px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all .12s; }
@@ -100,42 +104,46 @@
     .exc-chip .ec-cnt { background: rgba(15,23,42,.08); padding: 0 6px; border-radius: 99px; font-size: 11px; }
     .exc-chip.active .ec-cnt { background: rgba(255,255,255,.22); color: #fff; }
 
-    .pay-split { display: grid; grid-template-columns: minmax(290px, 38%) 1fr; gap: 16px; align-items: start; }
-    .pay-list-pane { border: 1px solid var(--border); border-radius: 12px; background: #f8fafc; overflow: hidden; }
-    .pay-list-search { padding: 10px; border-bottom: 1px solid var(--border); background: #fff; }
-    .pay-list-scroll { max-height: 70vh; overflow-y: auto; }
-    .pay-item { padding: 11px 13px; border-bottom: 1px solid #e2e8f0; cursor: pointer; background: #fff; transition: background .12s; }
-    .pay-item:hover { background: #f1f5f9; }
-    .pay-item.active { background: #eff6ff; border-left: 4px solid var(--brand); padding-left: 9px; }
-    .pay-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-    .pay-item-name { font-weight: 600; font-size: 14px; color: var(--text); }
-    .pay-item-net { font-weight: 700; font-size: 14.5px; color: #15803d; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .pay-item-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; font-size: 11.5px; color: var(--text-2); }
-    .pay-detail-pane { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 18px; }
-    .pay-detail-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
-    .pay-time-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; font-size: 12.5px; }
-    .pay-time-pill { background: #f1f5f9; color: #334155; padding: 4px 10px; border-radius: 8px; font-weight: 500; }
-    .pay-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .pay-box { border-radius: 12px; padding: 14px; border: 1px solid var(--border); }
+    .pay-split { display: grid; grid-template-columns: minmax(250px, 31%) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+    .pay-list-pane { border: 1px solid var(--border); border-radius: 12px; background: #fff; overflow: hidden; display: flex; flex-direction: column; max-height: 760px; }
+    .pay-list-search { padding: 10px; border-bottom: 1px solid var(--border); background: #f8fafc; flex-shrink: 0; }
+    .pay-list-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+    .pay-item { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; background: #fff; transition: background .12s; }
+    .pay-item:hover { background: #f8fafc; }
+    .pay-item.active { background: #eff6ff; border-left: 4px solid var(--brand); padding-left: 8px; }
+    .pay-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+    .pay-item-name { font-weight: 600; font-size: 13.5px; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pay-item-net { font-weight: 700; font-size: 13.5px; color: #15803d; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+    .pay-item-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; font-size: 11.5px; color: var(--text-2); }
+    .pay-detail-pane { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 16px; min-width: 0; }
+    .pay-detail-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+    .pay-time-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; font-size: 12px; }
+    .pay-time-pill { background: #f1f5f9; color: #334155; padding: 4px 9px; border-radius: 7px; font-weight: 500; white-space: nowrap; }
+    .pay-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+    .pay-box { border-radius: 12px; padding: 12px 13px; border: 1px solid var(--border); min-width: 0; }
     .pay-box-earn { background: #f0fdf4; border-color: #bbf7d0; }
     .pay-box-ded { background: #fef2f2; border-color: #fecaca; }
-    .pay-box-title { font-weight: 700; font-size: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .pay-box-head { margin-bottom: 10px; }
+    .pay-box-title { font-weight: 700; font-size: 13.5px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+    .pay-box-title span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .pay-box-sub { font-size: 11px; color: var(--text-2); margin-top: 2px; }
     .pay-box-earn .pay-box-title { color: #166534; }
     .pay-box-ded .pay-box-title { color: #991b1b; }
-    .pay-field { display: grid; grid-template-columns: 1fr 118px; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 13px; }
+    .pay-field { display: grid; grid-template-columns: minmax(0, 1fr) 98px; gap: 8px; align-items: center; margin-bottom: 7px; font-size: 12.5px; }
     .pay-field:last-child { margin-bottom: 0; }
-    .pay-field input { padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 8px; text-align: right; font-weight: 600; font-size: 13.5px; background: #fff; width: 100%; }
+    .pay-field label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pay-field input { padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 7px; text-align: right; font-weight: 600; font-size: 13px; background: #fff; width: 100%; }
     .pay-field input:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 2px rgba(37,99,235,.15); }
-    .pay-auto-val { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; padding: 5px 8px; border-radius: 7px; background: rgba(255,255,255,.7); color: var(--text-2); }
-    .pay-quick-btns { display: flex; gap: 4px; margin-top: 3px; }
-    .pay-quick-btn { border: 1px solid #86efac; background: #fff; color: #166534; border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    .pay-auto-val { text-align: right; font-weight: 600; font-size: 12.5px; font-variant-numeric: tabular-nums; padding: 5px 8px; border-radius: 7px; background: rgba(255,255,255,.72); color: var(--text-2); }
+    .pay-quick-btns { display: flex; gap: 3px; margin-top: 3px; }
+    .pay-quick-btn { border: 1px solid #86efac; background: #fff; color: #166534; border-radius: 5px; padding: 1px 6px; font-size: 10.5px; font-weight: 600; cursor: pointer; }
     .pay-quick-btn:hover { background: #16a34a; color: #fff; }
-    .pay-live-bar { margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: #0f172a; color: #fff; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
-    .pay-live-nums { display: flex; flex-wrap: wrap; gap: 16px; align-items: baseline; }
-    .pay-live-nums .lbl { font-size: 11.5px; color: #94a3b8; display: block; }
-    .pay-live-nums .val { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
-    .pay-live-nums .net { font-size: 21px; font-weight: 700; color: #4ade80; font-variant-numeric: tabular-nums; }
-    @media (max-width: 1020px) { .pay-split { grid-template-columns: 1fr; } .pay-cols { grid-template-columns: 1fr; } .pay-list-scroll { max-height: 260px; } }
+    .pay-live-bar { margin-top: 12px; padding: 12px 15px; border-radius: 11px; background: #0f172a; color: #fff; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+    .pay-live-nums { display: flex; flex-wrap: wrap; gap: 14px; align-items: baseline; }
+    .pay-live-nums .lbl { font-size: 11px; color: #94a3b8; display: block; }
+    .pay-live-nums .val { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .pay-live-nums .net { font-size: 20px; font-weight: 700; color: #4ade80; font-variant-numeric: tabular-nums; }
+    @media (max-width: 960px) { .pay-split { grid-template-columns: 1fr; } .pay-cols { grid-template-columns: 1fr; } .pay-list-pane { max-height: 260px; } }
     .stat { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); border: 1px solid rgba(226,232,240,.6); }
     .stat.clickable { cursor: pointer; transition: transform .12s, border-color .15s, box-shadow .15s; }
     .stat.clickable:hover { transform: translateY(-2px); border-color: var(--brand-2); box-shadow: 0 6px 18px rgba(29,78,216,.12); }
@@ -411,20 +419,18 @@
         <!-- Sub-tab 1: Summary & Pay Slips -->
         <div id="psub-summary">
           <div class="card">
-            <div class="card-head">
-              <div>
-                <h3 class="card-title">💰 คำนวณเงินเดือน & พิมพ์สลิป (เชื่อม Google Sheet เงินเดือน)</h3>
-                <div id="payrollSub" class="card-sub">กรอกข้อมูลได้ทั้งใน Google Sheet และบนหน้านี้ ซิงก์กันทันที</div>
+            <div class="pay-toolbar">
+              <div class="pay-toolbar-group">
+                <button class="btn btn-primary btn-sm" onclick="syncToPayrollSheet()">📤 ซิงก์เข้า Sheet</button>
+                <button class="btn btn-ghost btn-sm" onclick="loadPayroll()">🔄 โหลดยอด</button>
+                <a id="openPayrollSheetLink" href="#" target="_blank" class="btn btn-ghost btn-sm hidden">📄 เปิด Sheet</a>
               </div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button class="btn btn-primary btn-sm" onclick="syncToPayrollSheet()">📤 ส่งข้อมูลเข้า Calculation + Time Clock</button>
-                <button class="btn btn-ghost btn-sm" onclick="loadPayroll()">🔄 โหลดยอดล่าสุด</button>
-                <a id="openPayrollSheetLink" href="#" target="_blank" class="btn btn-soft-blue btn-sm hidden">📄 เปิด Google Sheet เงินเดือน</a>
-                <button class="btn btn-success btn-sm" onclick="printAllSlips()">🖨️ พิมพ์สลิปทั้งหมด</button>
-                <button class="btn btn-soft-green btn-sm" onclick="saveAllSlipsPdf()">📁 บันทึก PDF ทั้งหมดลง Drive</button>
+              <div class="pay-toolbar-group">
+                <button class="btn btn-soft-blue btn-sm" onclick="printAllSlips()">🖨️ พิมพ์สลิปทั้งหมด</button>
+                <button class="btn btn-success btn-sm" onclick="saveAllSlipsPdf()">📁 บันทึก PDF ทั้งหมด</button>
               </div>
             </div>
-            <div id="payrollStats" class="stats" style="margin-bottom:14px;"></div>
+            <div id="payrollStats" class="stats stats-row-5" style="margin-bottom:14px;"></div>
             <div id="payrollTableWrap"></div>
           </div>
         </div>
@@ -1278,7 +1284,6 @@
           $('openPayrollSheetLink').href = res.sheetUrl;
           $('openPayrollSheetLink').classList.remove('hidden');
         }
-        $('payrollSub').textContent = 'คลิกชื่อพนักงานฝั่งซ้ายเพื่อดูรายละเอียดและแก้ไขยอดได้ทันทีฝั่งขวา';
 
         const emps = res.employees || [];
         const sumNet = emps.reduce((s, e) => s + Number(e.net_pay || 0), 0);
@@ -1399,7 +1404,10 @@
 
         <div class="pay-cols">
           <div class="pay-box pay-box-earn">
-            <div class="pay-box-title"><span>🟢 รายได้ (บวกเพิ่ม)</span><span id="liveEarnTotal">0.00 ฿</span></div>
+            <div class="pay-box-head">
+              <div class="pay-box-title"><span>🟢 รายได้</span><span id="liveEarnTotal">0.00 ฿</span></div>
+              <div class="pay-box-sub">ช่องสีขาวแก้ไขได้ • ช่องสีเทาคำนวณอัตโนมัติ</div>
+            </div>
             <div class="pay-field">
               <label>ฐานเงินเดือน</label>
               <input id="piSalary" type="number" step="0.01" min="0" value="${Number(e.base_salary) || 0}" oninput="updatePayrollLive()" />
@@ -1421,45 +1429,48 @@
               <input id="piPos" type="number" step="0.01" min="0" value="${Number(e.position_allowance) || 0}" oninput="updatePayrollLive()" />
             </div>
             <div class="pay-field">
-              <label>เงินพิเศษ / ค่ามือถือ</label>
+              <label>เงินพิเศษ / มือถือ</label>
               <input id="piPhone" type="number" step="0.01" min="0" value="${Number(e.phone_allowance) || 0}" oninput="updatePayrollLive()" />
             </div>
             <div class="pay-field"><label class="card-sub">OT (อัตโนมัติ)</label><div id="piOtAuto" class="pay-auto-val">${fmtBaht(e.ot_baht)}</div></div>
-            <div class="pay-field"><label class="card-sub">ค่าคอมมิชชั่น (อัตโนมัติ)</label><div class="pay-auto-val">${fmtBaht(e.commission)}</div></div>
-            <div class="pay-field"><label class="card-sub">ค่าวัดหน้างาน (อัตโนมัติ)</label><div class="pay-auto-val">${fmtBaht(e.measurement)}</div></div>
-            <div class="pay-field"><label class="card-sub">ค่าหาโครง (อัตโนมัติ)</label><div class="pay-auto-val">${fmtBaht(e.frame_bonus)}</div></div>
+            <div class="pay-field"><label class="card-sub">ค่าคอมมิชชั่น</label><div class="pay-auto-val">${fmtBaht(e.commission)}</div></div>
+            <div class="pay-field"><label class="card-sub">ค่าวัดหน้างาน</label><div class="pay-auto-val">${fmtBaht(e.measurement)}</div></div>
+            <div class="pay-field"><label class="card-sub">ค่าหาโครง</label><div class="pay-auto-val">${fmtBaht(e.frame_bonus)}</div></div>
           </div>
 
           <div class="pay-box pay-box-ded">
-            <div class="pay-box-title"><span>🔴 รายการหัก (กรอกเลขปกติ ไม่ต้องใส่ -)</span><span id="liveDedTotal">0.00 ฿</span></div>
+            <div class="pay-box-head">
+              <div class="pay-box-title"><span>🔴 รายการหัก</span><span id="liveDedTotal">0.00 ฿</span></div>
+              <div class="pay-box-sub">กรอกเลขปกติ ไม่ต้องใส่เครื่องหมายลบ (-)</div>
+            </div>
             <div class="pay-field">
-              <label>หักค่าชุดยูนิฟอร์ม</label>
+              <label>ค่าชุดยูนิฟอร์ม</label>
               <input id="piUniform" type="number" step="0.01" min="0" value="${absNum(e.deduct_uniform)}" oninput="updatePayrollLive()" />
             </div>
             <div class="pay-field">
-              <label>หักค่าสินค้า</label>
+              <label>ค่าสินค้า</label>
               <input id="piGoods" type="number" step="0.01" min="0" value="${absNum(e.deduct_goods)}" oninput="updatePayrollLive()" />
             </div>
             <div class="pay-field">
-              <label>หักค่าเสียหาย</label>
+              <label>ค่าเสียหาย</label>
               <input id="piDmg" type="number" step="0.01" min="0" value="${absNum(e.deduct_damage)}" oninput="updatePayrollLive()" />
             </div>
             <div class="pay-field">
-              <label>เงินหักอื่นๆ / ลืมสแกน</label>
+              <label>หักอื่นๆ / ลืมสแกน</label>
               <input id="piOther" type="number" step="0.01" min="0" value="${absNum(e.deduct_other)}" oninput="updatePayrollLive()" />
             </div>
             <div class="pay-field">
-              <label>หักขาดวันห้ามหยุด</label>
+              <label>ขาดวันห้ามหยุด</label>
               <input id="piForbid" type="number" step="0.01" min="0" value="${absNum(e.deduct_forbid_absent)}" oninput="updatePayrollLive()" />
             </div>
             <div class="pay-field">
               <label>ภาษี (PND 1)</label>
               <input id="piTax" type="number" step="0.01" min="0" value="${absNum(e.tax)}" oninput="updatePayrollLive()" />
             </div>
-            <div class="pay-field"><label class="card-sub">หักขาดงาน (อัตโนมัติ)</label><div id="piAbsAuto" class="pay-auto-val">${fmtBaht(absNum(e.deduct_absent))}</div></div>
-            <div class="pay-field"><label class="card-sub">หักมาสาย (อัตโนมัติ)</label><div id="piLateAuto" class="pay-auto-val">${fmtBaht(absNum(e.deduct_late))}</div></div>
-            <div class="pay-field"><label class="card-sub">กองทุนสำรองฯ PVD (อัตโนมัติ)</label><div id="piPvdAuto" class="pay-auto-val">${fmtBaht(absNum(e.deduct_pvd))}</div></div>
-            <div class="pay-field"><label class="card-sub">ประกันสังคม 5% (อัตโนมัติ)</label><div id="piSsoAuto" class="pay-auto-val">${fmtBaht(absNum(e.sso))}</div></div>
+            <div class="pay-field"><label class="card-sub">ขาดงาน (อัตโนมัติ)</label><div id="piAbsAuto" class="pay-auto-val">${fmtBaht(absNum(e.deduct_absent))}</div></div>
+            <div class="pay-field"><label class="card-sub">มาสาย (อัตโนมัติ)</label><div id="piLateAuto" class="pay-auto-val">${fmtBaht(absNum(e.deduct_late))}</div></div>
+            <div class="pay-field"><label class="card-sub">กองทุนสำรองฯ PVD</label><div id="piPvdAuto" class="pay-auto-val">${fmtBaht(absNum(e.deduct_pvd))}</div></div>
+            <div class="pay-field"><label class="card-sub">ประกันสังคม 5%</label><div id="piSsoAuto" class="pay-auto-val">${fmtBaht(absNum(e.sso))}</div></div>
           </div>
         </div>
 
