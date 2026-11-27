@@ -84,6 +84,58 @@
     .pill-gray { background: #f1f5f9; color: #64748b; }
 
     .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .stats.stats-row-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; max-width: 1180px; }
+    .stats.stats-row-6 .stat { padding: 12px 13px; min-width: 0; }
+    .stats.stats-row-6 .stat .s-ico { width: 30px; height: 30px; font-size: 15px; margin-bottom: 7px; border-radius: 8px; }
+    .stats.stats-row-6 .stat .s-label { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stats.stats-row-6 .stat .s-val { font-size: clamp(15px, 1.45vw, 20px); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stats.stats-row-6 .stat .s-val small { font-size: clamp(10.5px, 0.95vw, 12.5px); }
+    .stats.stats-row-6 .stat .s-hint { font-size: 10.5px; margin-top: 5px; }
+    @media (max-width: 640px) { .stats.stats-row-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+    .exc-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .exc-chip { border: 1px solid var(--border); background: #fff; color: var(--text-2); padding: 5px 11px; border-radius: 99px; font-size: 12.5px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all .12s; }
+    .exc-chip:hover { border-color: var(--brand); color: var(--brand); }
+    .exc-chip.active { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }
+    .exc-chip .ec-cnt { background: rgba(15,23,42,.08); padding: 0 6px; border-radius: 99px; font-size: 11px; }
+    .exc-chip.active .ec-cnt { background: rgba(255,255,255,.22); color: #fff; }
+
+    .pay-split { display: grid; grid-template-columns: minmax(290px, 38%) 1fr; gap: 16px; align-items: start; }
+    .pay-list-pane { border: 1px solid var(--border); border-radius: 12px; background: #f8fafc; overflow: hidden; }
+    .pay-list-search { padding: 10px; border-bottom: 1px solid var(--border); background: #fff; }
+    .pay-list-scroll { max-height: 70vh; overflow-y: auto; }
+    .pay-item { padding: 11px 13px; border-bottom: 1px solid #e2e8f0; cursor: pointer; background: #fff; transition: background .12s; }
+    .pay-item:hover { background: #f1f5f9; }
+    .pay-item.active { background: #eff6ff; border-left: 4px solid var(--brand); padding-left: 9px; }
+    .pay-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .pay-item-name { font-weight: 600; font-size: 14px; color: var(--text); }
+    .pay-item-net { font-weight: 700; font-size: 14.5px; color: #15803d; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .pay-item-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; font-size: 11.5px; color: var(--text-2); }
+    .pay-detail-pane { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 18px; }
+    .pay-detail-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    .pay-time-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; font-size: 12.5px; }
+    .pay-time-pill { background: #f1f5f9; color: #334155; padding: 4px 10px; border-radius: 8px; font-weight: 500; }
+    .pay-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .pay-box { border-radius: 12px; padding: 14px; border: 1px solid var(--border); }
+    .pay-box-earn { background: #f0fdf4; border-color: #bbf7d0; }
+    .pay-box-ded { background: #fef2f2; border-color: #fecaca; }
+    .pay-box-title { font-weight: 700; font-size: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .pay-box-earn .pay-box-title { color: #166534; }
+    .pay-box-ded .pay-box-title { color: #991b1b; }
+    .pay-field { display: grid; grid-template-columns: 1fr 118px; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 13px; }
+    .pay-field:last-child { margin-bottom: 0; }
+    .pay-field input { padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 8px; text-align: right; font-weight: 600; font-size: 13.5px; background: #fff; width: 100%; }
+    .pay-field input:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 2px rgba(37,99,235,.15); }
+    .pay-auto-val { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; padding: 5px 8px; border-radius: 7px; background: rgba(255,255,255,.7); color: var(--text-2); }
+    .pay-quick-btns { display: flex; gap: 4px; margin-top: 3px; }
+    .pay-quick-btn { border: 1px solid #86efac; background: #fff; color: #166534; border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    .pay-quick-btn:hover { background: #16a34a; color: #fff; }
+    .pay-live-bar { margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: #0f172a; color: #fff; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+    .pay-live-nums { display: flex; flex-wrap: wrap; gap: 16px; align-items: baseline; }
+    .pay-live-nums .lbl { font-size: 11.5px; color: #94a3b8; display: block; }
+    .pay-live-nums .val { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .pay-live-nums .net { font-size: 21px; font-weight: 700; color: #4ade80; font-variant-numeric: tabular-nums; }
+    @media (max-width: 1020px) { .pay-split { grid-template-columns: 1fr; } .pay-cols { grid-template-columns: 1fr; } .pay-list-scroll { max-height: 260px; } }
     .stat { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); border: 1px solid rgba(226,232,240,.6); }
     .stat.clickable { cursor: pointer; transition: transform .12s, border-color .15s, box-shadow .15s; }
     .stat.clickable:hover { transform: translateY(-2px); border-color: var(--brand-2); box-shadow: 0 6px 18px rgba(29,78,216,.12); }
@@ -258,6 +310,7 @@
               <div id="overviewUpdated" class="card-sub"></div>
             </div>
           </div>
+          <div id="exceptionFilters" class="exc-filters"></div>
           <div id="exceptionTable"></div>
         </div>
       </section>
@@ -294,7 +347,7 @@
             <select id="empSelect" class="select select-inline"></select>
           </div>
         </div>
-        <div id="personStats" class="stats"></div>
+        <div id="personStats" class="stats stats-row-6"></div>
         <div class="card">
           <div class="card-head">
             <h3 class="card-title">ตารางเวลารายวัน</h3>
@@ -710,7 +763,25 @@
       return `<div${clickAttr}><div class="s-ico" style="background:${bg}">${icon}</div><div class="s-label">${esc(label)}</div><div class="s-val">${esc(val)}<small>${esc(unit || '')}</small></div>${hintHtml}</div>`;
     }
 
+    const EXC_LABELS = {
+      ABSENT: 'ไม่พบการสแกนนิ้ว',
+      ODD_SCAN: 'ลืมสแกนเข้า/ออก',
+      SHORT_WORK: 'ทำงานน้อยผิดปกติ',
+      OT_CAPPED: 'OT ไม่ครบเวลา',
+      OT_NO_SCAN: 'OT ไม่มีสแกน',
+      LEAVE_SCAN_CONFLICT: 'ลาเต็มวันแต่มีสแกน',
+      WAITING_MEDICAL_CERT: 'รอใบรับรองแพทย์',
+      PERSONAL_UNDER_8H_UNPAID: 'ลากิจแจ้ง < 8 ชม.',
+      PENDING_VACATION: 'ลาพักร้อนรออนุมัติ',
+      PENDING_OT: 'OT รออนุมัติ',
+      MISSED_SCAN: 'แจ้งลืมสแกน',
+      CONSECUTIVE_LEAVE_3PLUS: 'หยุดต่อเนื่อง 3+ วัน'
+    };
+    let OVERVIEW_DATA = null;
+    let EXC_FILTER = 'ALL';
+
     function renderOverview(ov) {
+      OVERVIEW_DATA = ov;
       const s = ov.stats;
       $('overviewStats').innerHTML = [
         statCard('⚠️', 'var(--amber-soft)', 'Exception List', s.exceptionCount, 'รายการ'),
@@ -722,13 +793,30 @@
 
       $('overviewUpdated').textContent = ov.computed ? `คำนวณล่าสุด: ${ov.lastUpdated}` : 'ยังไม่มีข้อมูลสรุปของเดือนนี้ — กด "คำนวณใหม่" หรือนำเข้าเวลาสแกนนิ้ว';
 
-      if (!ov.exceptions.length) {
+      const excs = ov.exceptions || [];
+      if (!excs.length) {
+        $('exceptionFilters').innerHTML = '';
         $('exceptionTable').innerHTML = emptyState(ov.computed ? '🎉' : '📭', ov.computed ? 'ไม่มีเคสผิดปกติในเดือนนี้' : 'ยังไม่มีข้อมูล');
         return;
       }
+
+      const counts = {};
+      excs.forEach(r => { counts[r.code] = (counts[r.code] || 0) + 1; });
+      if (EXC_FILTER !== 'ALL' && !counts[EXC_FILTER]) EXC_FILTER = 'ALL';
+
+      const codes = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+      $('exceptionFilters').innerHTML = [
+        `<button type="button" class="exc-chip ${EXC_FILTER === 'ALL' ? 'active' : ''}" onclick="setExcFilter('ALL')">ทั้งหมด <span class="ec-cnt">${excs.length}</span></button>`,
+        ...codes.map(code => {
+          const th = EXC_LABELS[code] ? ` (${EXC_LABELS[code]})` : '';
+          return `<button type="button" class="exc-chip ${EXC_FILTER === code ? 'active' : ''}" onclick="setExcFilter('${esc(code)}')">${esc(code)}${esc(th)} <span class="ec-cnt">${counts[code]}</span></button>`;
+        })
+      ].join('');
+
+      const filtered = EXC_FILTER === 'ALL' ? excs : excs.filter(r => r.code === EXC_FILTER);
       $('exceptionTable').innerHTML = `<div class="table-wrap"><table>
         <thead><tr><th>วันที่</th><th>พนักงาน</th><th>เข้า-ออก</th><th>ประเภท</th><th>รายละเอียด</th><th></th></tr></thead>
-        <tbody>${ov.exceptions.map(r => `
+        <tbody>${filtered.map(r => `
           <tr>
             <td class="mono">${esc(shortDate(r.work_date))}</td>
             <td><b>${esc(r.name)}${r.nickname && r.nickname !== r.name ? ` (${esc(r.nickname)})` : ''}</b> <span class="card-sub">#${esc(r.employee_id)}</span></td>
@@ -741,6 +829,11 @@
               <button class="btn btn-ghost btn-sm" onclick="openPerson('${esc(r.employee_id)}')">ดูรายคน</button>
             </td>
           </tr>`).join('')}</tbody></table></div>`;
+    }
+
+    function setExcFilter(code) {
+      EXC_FILTER = code;
+      if (OVERVIEW_DATA) renderOverview(OVERVIEW_DATA);
     }
 
     function openPerson(empId) { $('empSelect').value = empId; switchTab('person'); }
@@ -1173,6 +1266,8 @@
 
     /* ================= Payroll & Pay Slip Printer ================= */
     let PAYROLL_CACHE = { periodTitle: '', employees: [], sheetUrl: '' };
+    let PAYROLL_SELECTED_IDX = 0;
+    let PAYROLL_SEARCH = '';
     const fmtBaht = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     async function loadPayroll() {
@@ -1183,7 +1278,7 @@
           $('openPayrollSheetLink').href = res.sheetUrl;
           $('openPayrollSheetLink').classList.remove('hidden');
         }
-        $('payrollSub').textContent = 'โครงสร้าง Calculation (33 คอลัมน์) • เชื่อมข้อมูลตรงจากระบบลงเวลา + สูตรค่าคอมฯ/ค่าหาโครง/ประกันสังคม';
+        $('payrollSub').textContent = 'คลิกชื่อพนักงานฝั่งซ้ายเพื่อดูรายละเอียดและแก้ไขยอดได้ทันทีฝั่งขวา';
 
         const emps = res.employees || [];
         const sumNet = emps.reduce((s, e) => s + Number(e.net_pay || 0), 0);
@@ -1203,84 +1298,264 @@
           $('payrollTableWrap').innerHTML = emptyState('📄', 'ไม่พบข้อมูลพนักงานในชีต Calculation');
           return;
         }
-        $('payrollTableWrap').innerHTML = `<div class="table-wrap"><table>
-          <thead><tr><th>รหัส</th><th>ชื่อ-สกุล (ชื่อเล่น)</th><th class="num">ฐานเงินเดือน</th><th class="num">OT (บ.)</th><th class="num">คอม+วัด+โครง</th><th class="num">เบี้ยขยัน</th><th class="num">หักรวม+SSO+ภาษี</th><th class="num">ยอดจ่ายสุทธิ</th><th>จัดการ</th></tr></thead>
-          <tbody>${emps.map((e, i) => {
-            const extra = e.commission + e.measurement + e.frame_bonus;
-            const totalDed = e.deduct_absent + e.deduct_pvd + e.deduct_uniform + e.deduct_goods + e.deduct_damage + e.deduct_other + e.deduct_forbid_absent + e.deduct_late + e.sso + e.tax;
-            return `<tr>
-              <td class="mono">${esc(e.code)}</td>
-              <td><b>${esc(e.name)}</b> <span class="card-sub">${esc(e.nickname ? '(' + e.nickname + ')' : '')}</span></td>
-              <td class="num">${fmtBaht(e.base_salary)}</td>
-              <td class="num">${fmtBaht(e.ot_baht)}</td>
-              <td class="num">${fmtBaht(extra)}</td>
-              <td class="num">${fmtBaht(e.diligence)}</td>
-              <td class="num" style="color:var(--red);">${fmtBaht(totalDed)}</td>
-              <td class="num"><b>${fmtBaht(e.net_pay)}</b></td>
-              <td style="white-space:nowrap;">
-                <button class="btn btn-ghost btn-sm" onclick="openEditPayrollModal(${i})">✏️ แก้ไข</button>
-                <button class="btn btn-soft-blue btn-sm" onclick="printSingleSlip(${i})">🖨️ สลิป</button>
-                <button class="btn btn-soft-green btn-sm" onclick="saveSingleSlipPdf(${i})">📄 PDF</button>
-              </td>
-            </tr>`;
-          }).join('')}</tbody></table></div>`;
+        if (PAYROLL_SELECTED_IDX >= emps.length) PAYROLL_SELECTED_IDX = 0;
+        renderPayrollSplit();
       } catch (err) {
         $('payrollStats').innerHTML = '';
         $('payrollTableWrap').innerHTML = `<div class="callout warn"><span>⚠️</span><div>${esc(err.message)}</div></div>`;
       }
     }
 
+    function renderPayrollSplit() {
+      const emps = PAYROLL_CACHE.employees || [];
+      if (!emps.length) return;
+      $('payrollTableWrap').innerHTML = `
+        <div class="pay-split">
+          <div class="pay-list-pane">
+            <div class="pay-list-search">
+              <input id="paySearchInput" class="input" style="padding:8px 10px; font-size:13px;" placeholder="🔍 ค้นหาชื่อ / ชื่อเล่น / รหัส..." value="${esc(PAYROLL_SEARCH)}" oninput="PAYROLL_SEARCH=this.value; renderPayrollListOnly()" />
+            </div>
+            <div id="payListScroll" class="pay-list-scroll"></div>
+          </div>
+          <div id="payDetailPane" class="pay-detail-pane"></div>
+        </div>`;
+      renderPayrollListOnly();
+      renderPayrollDetail();
+    }
+
+    function renderPayrollListOnly() {
+      const emps = PAYROLL_CACHE.employees || [];
+      const q = PAYROLL_SEARCH.trim().toLowerCase();
+      const items = emps.map((e, idx) => ({ e, idx })).filter(({ e }) => {
+        if (!q) return true;
+        return (`${e.code} ${e.name} ${e.nickname}`).toLowerCase().includes(q);
+      });
+      const wrap = $('payListScroll');
+      if (!wrap) return;
+      if (!items.length) {
+        wrap.innerHTML = emptyState('🔍', 'ไม่พบพนักงานที่ค้นหา');
+        return;
+      }
+      wrap.innerHTML = items.map(({ e, idx }) => {
+        const extra = (Number(e.commission) || 0) + (Number(e.measurement) || 0) + (Number(e.frame_bonus) || 0);
+        const totalDed = Math.abs(
+          (Number(e.deduct_absent) || 0) + (Number(e.deduct_pvd) || 0) + (Number(e.deduct_uniform) || 0) +
+          (Number(e.deduct_goods) || 0) + (Number(e.deduct_damage) || 0) + (Number(e.deduct_other) || 0) +
+          (Number(e.deduct_forbid_absent) || 0) + (Number(e.deduct_late) || 0) + (Number(e.sso) || 0) + (Number(e.tax) || 0)
+        );
+        const active = idx === PAYROLL_SELECTED_IDX ? 'active' : '';
+        return `<div class="pay-item ${active}" onclick="selectPayrollEmp(${idx})">
+          <div class="pay-item-top">
+            <div class="pay-item-name">${idx + 1}. ${esc(e.name)}${e.nickname && e.nickname !== e.name ? ` <span class="card-sub">(${esc(e.nickname)})</span>` : ''}</div>
+            <div class="pay-item-net">${fmtBaht(e.net_pay)} ฿</div>
+          </div>
+          <div class="pay-item-meta">
+            <span>ฐาน ${fmtBaht(e.base_salary)}</span>
+            ${e.ot_baht ? `<span>• OT ${fmtBaht(e.ot_baht)}</span>` : ''}
+            ${extra ? `<span>• พิเศษ ${fmtBaht(extra)}</span>` : ''}
+            ${e.diligence ? `<span>• ขยัน ${fmtBaht(e.diligence)}</span>` : ''}
+            ${totalDed ? `<span style="color:var(--red);">• หัก -${fmtBaht(totalDed)}</span>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function selectPayrollEmp(idx) {
+      PAYROLL_SELECTED_IDX = idx;
+      renderPayrollListOnly();
+      renderPayrollDetail();
+    }
+
+    function renderPayrollDetail() {
+      const emps = PAYROLL_CACHE.employees || [];
+      const i = PAYROLL_SELECTED_IDX;
+      const e = emps[i];
+      const pane = $('payDetailPane');
+      if (!e || !pane) return;
+
+      const absNum = v => Math.abs(Number(v) || 0);
+      pane.innerHTML = `
+        <div class="pay-detail-head">
+          <div>
+            <div style="font-weight:700; font-size:17px;">${esc(e.name)}${e.nickname && e.nickname !== e.name ? ` (${esc(e.nickname)})` : ''}</div>
+            <div class="card-sub">รหัส ${esc(e.code)}${e.position ? ' • ' + esc(e.position) : ''}${e.bank ? ' • ' + esc(e.bank) + ' ' + esc(e.bank_account || '') : ''}</div>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+            <button class="btn btn-ghost btn-sm" ${i <= 0 ? 'disabled' : ''} onclick="selectPayrollEmp(${i - 1})">‹ ก่อนหน้า</button>
+            <span class="card-sub">${i + 1}/${emps.length}</span>
+            <button class="btn btn-ghost btn-sm" ${i >= emps.length - 1 ? 'disabled' : ''} onclick="selectPayrollEmp(${i + 1})">ถัดไป ›</button>
+            <button class="btn btn-soft-blue btn-sm" onclick="printSingleSlip(${i})">🖨️ สลิป</button>
+            <button class="btn btn-soft-green btn-sm" onclick="saveSingleSlipPdf(${i})">📄 PDF</button>
+          </div>
+        </div>
+
+        <div class="pay-time-strip">
+          <span class="pay-time-pill">📅 มาทำงาน <b>${e.work_days || 0}</b> วัน</span>
+          <span class="pay-time-pill">🕒 ปกติ <b>${e.work_hours || 0}</b> ชม.</span>
+          <span class="pay-time-pill">💪 OT <b>${e.ot15_hours || 0}</b> ชม.</span>
+          <span class="pay-time-pill">⏰ สาย <b>${e.late_min || 0}</b> น.</span>
+          <span class="pay-time-pill">🚫 ขาด <b>${e.absent_hours || 0}</b> ชม.</span>
+        </div>
+
+        <div class="pay-cols">
+          <div class="pay-box pay-box-earn">
+            <div class="pay-box-title"><span>🟢 รายได้ (บวกเพิ่ม)</span><span id="liveEarnTotal">0.00 ฿</span></div>
+            <div class="pay-field">
+              <label>ฐานเงินเดือน</label>
+              <input id="piSalary" type="number" step="0.01" min="0" value="${Number(e.base_salary) || 0}" oninput="updatePayrollLive()" />
+            </div>
+            <div class="pay-field">
+              <div>
+                <label>เบี้ยขยัน</label>
+                <div class="pay-quick-btns">
+                  <button type="button" class="pay-quick-btn" onclick="$('piDil').value=0;updatePayrollLive()">0</button>
+                  <button type="button" class="pay-quick-btn" onclick="$('piDil').value=500;updatePayrollLive()">500</button>
+                  <button type="button" class="pay-quick-btn" onclick="$('piDil').value=650;updatePayrollLive()">650</button>
+                  <button type="button" class="pay-quick-btn" onclick="$('piDil').value=800;updatePayrollLive()">800</button>
+                </div>
+              </div>
+              <input id="piDil" type="number" step="1" min="0" value="${Number(e.diligence) || 0}" oninput="updatePayrollLive()" />
+            </div>
+            <div class="pay-field">
+              <label>ค่าประจำตำแหน่ง</label>
+              <input id="piPos" type="number" step="0.01" min="0" value="${Number(e.position_allowance) || 0}" oninput="updatePayrollLive()" />
+            </div>
+            <div class="pay-field">
+              <label>เงินพิเศษ / ค่ามือถือ</label>
+              <input id="piPhone" type="number" step="0.01" min="0" value="${Number(e.phone_allowance) || 0}" oninput="updatePayrollLive()" />
+            </div>
+            <div class="pay-field"><label class="card-sub">OT (อัตโนมัติ)</label><div id="piOtAuto" class="pay-auto-val">${fmtBaht(e.ot_baht)}</div></div>
+            <div class="pay-field"><label class="card-sub">ค่าคอมมิชชั่น (อัตโนมัติ)</label><div class="pay-auto-val">${fmtBaht(e.commission)}</div></div>
+            <div class="pay-field"><label class="card-sub">ค่าวัดหน้างาน (อัตโนมัติ)</label><div class="pay-auto-val">${fmtBaht(e.measurement)}</div></div>
+            <div class="pay-field"><label class="card-sub">ค่าหาโครง (อัตโนมัติ)</label><div class="pay-auto-val">${fmtBaht(e.frame_bonus)}</div></div>
+          </div>
+
+          <div class="pay-box pay-box-ded">
+            <div class="pay-box-title"><span>🔴 รายการหัก (กรอกเลขปกติ ไม่ต้องใส่ -)</span><span id="liveDedTotal">0.00 ฿</span></div>
+            <div class="pay-field">
+              <label>หักค่าชุดยูนิฟอร์ม</label>
+              <input id="piUniform" type="number" step="0.01" min="0" value="${absNum(e.deduct_uniform)}" oninput="updatePayrollLive()" />
+            </div>
+            <div class="pay-field">
+              <label>หักค่าสินค้า</label>
+              <input id="piGoods" type="number" step="0.01" min="0" value="${absNum(e.deduct_goods)}" oninput="updatePayrollLive()" />
+            </div>
+            <div class="pay-field">
+              <label>หักค่าเสียหาย</label>
+              <input id="piDmg" type="number" step="0.01" min="0" value="${absNum(e.deduct_damage)}" oninput="updatePayrollLive()" />
+            </div>
+            <div class="pay-field">
+              <label>เงินหักอื่นๆ / ลืมสแกน</label>
+              <input id="piOther" type="number" step="0.01" min="0" value="${absNum(e.deduct_other)}" oninput="updatePayrollLive()" />
+            </div>
+            <div class="pay-field">
+              <label>หักขาดวันห้ามหยุด</label>
+              <input id="piForbid" type="number" step="0.01" min="0" value="${absNum(e.deduct_forbid_absent)}" oninput="updatePayrollLive()" />
+            </div>
+            <div class="pay-field">
+              <label>ภาษี (PND 1)</label>
+              <input id="piTax" type="number" step="0.01" min="0" value="${absNum(e.tax)}" oninput="updatePayrollLive()" />
+            </div>
+            <div class="pay-field"><label class="card-sub">หักขาดงาน (อัตโนมัติ)</label><div id="piAbsAuto" class="pay-auto-val">${fmtBaht(absNum(e.deduct_absent))}</div></div>
+            <div class="pay-field"><label class="card-sub">หักมาสาย (อัตโนมัติ)</label><div id="piLateAuto" class="pay-auto-val">${fmtBaht(absNum(e.deduct_late))}</div></div>
+            <div class="pay-field"><label class="card-sub">กองทุนสำรองฯ PVD (อัตโนมัติ)</label><div id="piPvdAuto" class="pay-auto-val">${fmtBaht(absNum(e.deduct_pvd))}</div></div>
+            <div class="pay-field"><label class="card-sub">ประกันสังคม 5% (อัตโนมัติ)</label><div id="piSsoAuto" class="pay-auto-val">${fmtBaht(absNum(e.sso))}</div></div>
+          </div>
+        </div>
+
+        <div class="pay-live-bar">
+          <div class="pay-live-nums">
+            <div><span class="lbl">รวมรายได้</span><span id="liveEarnBar" class="val">0.00</span></div>
+            <div><span class="lbl">รวมรายการหัก</span><span id="liveDedBar" class="val" style="color:#fca5a5;">-0.00</span></div>
+            <div><span class="lbl">ยอดจ่ายสุทธิ (ประมาณการสด)</span><span id="liveNetBar" class="net">0.00 ฿</span></div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="savePayrollInline(false)">💾 บันทึก</button>
+            ${i < emps.length - 1 ? '<button class="btn btn-success" onclick="savePayrollInline(true)">💾 บันทึก & คนถัดไป ›</button>' : ''}
+          </div>
+        </div>`;
+      updatePayrollLive();
+    }
+
+    function updatePayrollLive() {
+      const e = (PAYROLL_CACHE.employees || [])[PAYROLL_SELECTED_IDX];
+      if (!e) return;
+      const sal = Number($('piSalary').value) || 0;
+      const dil = Number($('piDil').value) || 0;
+      const pos = Number($('piPos').value) || 0;
+      const phone = Number($('piPhone').value) || 0;
+
+      // คำนวณตัวเลขที่อิงฐานเงินเดือนสดๆ ให้ตรงสูตร Calculation
+      const otAuto = Math.round((Number(e.ot15_hours) || 0) * (sal / 240) * 1.5 * 100) / 100;
+      const absAuto = Math.round((Number(e.absent_hours) || 0) * (sal / 240) * 100) / 100;
+      const lateAuto = Math.round(((Number(e.late_min) || 0) / 60) * (sal / 240) * 100) / 100;
+      const pvdRate = (Number(e.base_salary) > 0 && Math.abs(Number(e.deduct_pvd) || 0) > 0)
+        ? Math.abs(Number(e.deduct_pvd)) / Number(e.base_salary) : 0;
+      const pvdAuto = Math.round(sal * pvdRate * 100) / 100;
+      const ssoAuto = sal < 100 ? 0 : Math.round(Math.min(sal * 0.05, 875));
+
+      const comm = Number(e.commission) || 0;
+      const meas = Number(e.measurement) || 0;
+      const frame = Number(e.frame_bonus) || 0;
+
+      const uUniform = Math.abs(Number($('piUniform').value) || 0);
+      const uGoods = Math.abs(Number($('piGoods').value) || 0);
+      const uDmg = Math.abs(Number($('piDmg').value) || 0);
+      const uOther = Math.abs(Number($('piOther').value) || 0);
+      const uForbid = Math.abs(Number($('piForbid').value) || 0);
+      const uTax = Math.abs(Number($('piTax').value) || 0);
+
+      const totalEarn = sal + otAuto + comm + meas + frame + dil + pos + phone;
+      const totalDedBeforeSso = absAuto + lateAuto + pvdAuto + uUniform + uGoods + uDmg + uOther + uForbid;
+      const netBeforeSso = Math.round(totalEarn - totalDedBeforeSso);
+      const totalDedAll = totalDedBeforeSso + ssoAuto + uTax;
+      const netPay = Math.ceil(netBeforeSso - ssoAuto - uTax);
+
+      if ($('piOtAuto')) $('piOtAuto').textContent = fmtBaht(otAuto);
+      if ($('piAbsAuto')) $('piAbsAuto').textContent = fmtBaht(absAuto);
+      if ($('piLateAuto')) $('piLateAuto').textContent = fmtBaht(lateAuto);
+      if ($('piPvdAuto')) $('piPvdAuto').textContent = fmtBaht(pvdAuto);
+      if ($('piSsoAuto')) $('piSsoAuto').textContent = fmtBaht(ssoAuto);
+      if ($('liveEarnTotal')) $('liveEarnTotal').textContent = fmtBaht(totalEarn) + ' ฿';
+      if ($('liveDedTotal')) $('liveDedTotal').textContent = '-' + fmtBaht(totalDedAll) + ' ฿';
+      if ($('liveEarnBar')) $('liveEarnBar').textContent = fmtBaht(totalEarn);
+      if ($('liveDedBar')) $('liveDedBar').textContent = '-' + fmtBaht(totalDedAll);
+      if ($('liveNetBar')) $('liveNetBar').textContent = fmtBaht(netPay) + ' ฿';
+    }
+
+    async function savePayrollInline(goNext) {
+      const emps = PAYROLL_CACHE.employees || [];
+      const e = emps[PAYROLL_SELECTED_IDX];
+      if (!e) return;
+      const neg = id => { const n = Math.abs(Number($(id).value) || 0); return n ? -n : 0; };
+      try {
+        await call('adminUpdatePayrollRow', e.rowIndex, {
+          base_salary: Number($('piSalary').value) || 0,
+          diligence: Number($('piDil').value) || 0,
+          position_allowance: Number($('piPos').value) || 0,
+          phone_allowance: Number($('piPhone').value) || 0,
+          deduct_uniform: neg('piUniform'),
+          deduct_goods: neg('piGoods'),
+          deduct_damage: neg('piDmg'),
+          deduct_other: neg('piOther'),
+          deduct_forbid_absent: neg('piForbid'),
+          tax: neg('piTax')
+        });
+        toast(`บันทึกข้อมูลของ ${e.nickname || e.name} เรียบร้อย`, 'success');
+        if (goNext && PAYROLL_SELECTED_IDX < emps.length - 1) PAYROLL_SELECTED_IDX++;
+        await loadPayroll();
+      } catch (err) { toast(err.message, 'error'); }
+    }
+
     async function syncToPayrollSheet() {
       const ym = $('monthPicker').value;
-      const ok = await modal({ title: `ส่งข้อมูลเดือน ${ymLabel(ym)} เข้า Sheet เงินเดือน?`, body: 'ระบบจะส่งสรุปเวลา/OT/สาย/ขาดงานตรงเข้าชีต "Calculation" และส่งตาราง 15 คอลัมน์เข้าชีต "Time Clock" เพื่อไว้ตรวจเทียบด้วยครับ', confirmText: '📤 ส่งข้อมูลเลย', confirmClass: 'btn-primary' });
+      const ok = await modal({ title: `ส่งข้อมูลเดือน ${ymLabel(ym)} เข้า Sheet เงินเดือน?`, body: 'ระบบจะส่งสรุปเวลา/OT/สาย/ขาดงาน ค่าวัดหน้างาน และค่าหาโครง ตรงเข้าชีต "Calculation" และส่งตาราง 15 คอลัมน์เข้าชีต "Time Clock" ด้วยครับ', confirmText: '📤 ส่งข้อมูลเลย', confirmClass: 'btn-primary' });
       if (!ok) return;
       try {
         const res = await call('adminSyncTimeClockToPayroll', ym);
         toast(`ส่งเข้า Calculation (${res.calcUpdated} คน) และ Time Clock (${res.rowsWritten} แถว) เรียบร้อย`, 'success');
         loadPayroll();
       } catch (err) { toast(err.message, 'error'); }
-    }
-
-    function openEditPayrollModal(idx) {
-      const e = PAYROLL_CACHE.employees[idx];
-      if (!e) return;
-      const root = $('modalRoot');
-      root.innerHTML = `<div class="modal-bg"><div class="modal">
-        <h3>แก้ไขรายได้ / รายการหัก • ${esc(e.name)}</h3>
-        <p>บันทึกลงชีต Calculation โดยตรง (รายการหักให้ใส่เครื่องหมายลบ เช่น -200)</p>
-        <div class="grid-2">
-          <div><label class="card-sub">ฐานเงินเดือน (F)</label><input id="epSalary" type="number" class="input" value="${e.base_salary}" /></div>
-          <div><label class="card-sub">เบี้ยขยัน (AT)</label><input id="epDil" type="number" class="input" value="${e.diligence}" /></div>
-          <div><label class="card-sub">ค่าประจำตำแหน่ง (AU)</label><input id="epPos" type="number" class="input" value="${e.position_allowance}" /></div>
-          <div><label class="card-sub">เงินพิเศษ/มือถือ (AV)</label><input id="epPhone" type="number" class="input" value="${e.phone_allowance}" /></div>
-          <div><label class="card-sub">หักค่าสินค้า (BA)</label><input id="epGoods" type="number" class="input" value="${e.deduct_goods}" /></div>
-          <div><label class="card-sub">หักค่าเสียหาย (BB)</label><input id="epDmg" type="number" class="input" value="${e.deduct_damage}" /></div>
-          <div><label class="card-sub">เงินหักอื่นๆ/ลืมสแกน (BC)</label><input id="epOther" type="number" class="input" value="${e.deduct_other}" /></div>
-          <div><label class="card-sub">หักขาดวันห้ามหยุด (BD)</label><input id="epForbid" type="number" class="input" value="${e.deduct_forbid_absent}" /></div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-ghost" id="epCancel">ยกเลิก</button>
-          <button class="btn btn-primary" id="epSave">💾 บันทึก</button>
-        </div>
-      </div></div>`;
-      $('epCancel').onclick = () => { root.innerHTML = ''; };
-      $('epSave').onclick = async () => {
-        try {
-          await call('adminUpdatePayrollRow', e.rowIndex, {
-            base_salary: $('epSalary').value,
-            diligence: $('epDil').value,
-            position_allowance: $('epPos').value,
-            phone_allowance: $('epPhone').value,
-            deduct_goods: $('epGoods').value,
-            deduct_damage: $('epDmg').value,
-            deduct_other: $('epOther').value,
-            deduct_forbid_absent: $('epForbid').value
-          });
-          root.innerHTML = '';
-          toast('บันทึกข้อมูลลง Sheet เงินเดือนเรียบร้อย', 'success');
-          loadPayroll();
-        } catch (err) { toast(err.message, 'error'); }
-      };
     }
 
     function buildSlipHtml(e, periodTitle) {
