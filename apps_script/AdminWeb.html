@@ -104,17 +104,19 @@
     .exc-chip .ec-cnt { background: rgba(15,23,42,.08); padding: 0 6px; border-radius: 99px; font-size: 11px; }
     .exc-chip.active .ec-cnt { background: rgba(255,255,255,.22); color: #fff; }
 
-    .pay-split { display: grid; grid-template-columns: minmax(250px, 31%) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+    .pay-split { display: grid; grid-template-columns: minmax(225px, 27%) minmax(0, 1fr); gap: 14px; align-items: stretch; }
     .pay-list-pane { border: 1px solid var(--border); border-radius: 12px; background: #fff; overflow: hidden; display: flex; flex-direction: column; max-height: 760px; }
     .pay-list-search { padding: 10px; border-bottom: 1px solid var(--border); background: #f8fafc; flex-shrink: 0; }
     .pay-list-scroll { flex: 1; overflow-y: auto; min-height: 0; }
-    .pay-item { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; background: #fff; transition: background .12s; }
+    .pay-item { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; background: #fff; transition: background .12s; }
     .pay-item:hover { background: #f8fafc; }
     .pay-item.active { background: #eff6ff; border-left: 4px solid var(--brand); padding-left: 8px; }
-    .pay-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
-    .pay-item-name { font-weight: 600; font-size: 13.5px; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .pay-item-net { font-weight: 700; font-size: 13.5px; color: #15803d; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
-    .pay-item-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; font-size: 11.5px; color: var(--text-2); }
+    .pay-item-name { font-weight: 600; font-size: 13px; color: var(--text); line-height: 1.3; }
+    .pay-item-net { font-weight: 700; font-size: 15px; color: #15803d; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .pay-item-breakdown { display: grid; gap: 1px; margin-top: 4px; font-size: 11px; color: var(--text-2); }
+    .pay-item-b-row { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+    .pay-item-b-row .b-plus { color: #15803d; font-weight: 600; }
+    .pay-item-b-row .b-minus { color: #dc2626; font-weight: 600; }
     .pay-detail-pane { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 16px; min-width: 0; }
     .pay-detail-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
     .pay-time-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; font-size: 12px; }
@@ -138,10 +140,13 @@
     .pay-quick-btns { display: flex; gap: 3px; margin-top: 3px; }
     .pay-quick-btn { border: 1px solid #86efac; background: #fff; color: #166534; border-radius: 5px; padding: 1px 6px; font-size: 10.5px; font-weight: 600; cursor: pointer; }
     .pay-quick-btn:hover { background: #16a34a; color: #fff; }
-    .pay-live-bar { margin-top: 12px; padding: 12px 15px; border-radius: 11px; background: #0f172a; color: #fff; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
-    .pay-live-nums { display: flex; flex-wrap: wrap; gap: 14px; align-items: baseline; }
-    .pay-live-nums .lbl { font-size: 11px; color: #94a3b8; display: block; }
+    .pay-live-bar { margin-top: 12px; padding: 13px 15px; border-radius: 11px; background: #0f172a; color: #fff; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+    .pay-live-nums { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .pay-live-op { font-size: 16px; font-weight: 700; color: #64748b; padding: 0 2px; }
+    .pay-live-nums .lbl { font-size: 10.5px; color: #94a3b8; display: block; }
     .pay-live-nums .val { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .pay-live-nums .val-plus { color: #86efac; }
+    .pay-live-nums .val-minus { color: #fca5a5; }
     .pay-live-nums .net { font-size: 20px; font-weight: 700; color: #4ade80; font-variant-numeric: tabular-nums; }
     @media (max-width: 960px) { .pay-split { grid-template-columns: 1fr; } .pay-cols { grid-template-columns: 1fr; } .pay-list-pane { max-height: 260px; } }
     .stat { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); border: 1px solid rgba(226,232,240,.6); }
@@ -1342,7 +1347,8 @@
         return;
       }
       wrap.innerHTML = items.map(({ e, idx }) => {
-        const extra = (Number(e.commission) || 0) + (Number(e.measurement) || 0) + (Number(e.frame_bonus) || 0);
+        const extraEarn = (Number(e.ot_baht) || 0) + (Number(e.commission) || 0) + (Number(e.measurement) || 0) +
+          (Number(e.frame_bonus) || 0) + (Number(e.diligence) || 0) + (Number(e.position_allowance) || 0) + (Number(e.phone_allowance) || 0);
         const totalDed = Math.abs(
           (Number(e.deduct_absent) || 0) + (Number(e.deduct_pvd) || 0) + (Number(e.deduct_uniform) || 0) +
           (Number(e.deduct_goods) || 0) + (Number(e.deduct_damage) || 0) + (Number(e.deduct_other) || 0) +
@@ -1350,16 +1356,12 @@
         );
         const active = idx === PAYROLL_SELECTED_IDX ? 'active' : '';
         return `<div class="pay-item ${active}" onclick="selectPayrollEmp(${idx})">
-          <div class="pay-item-top">
-            <div class="pay-item-name">${idx + 1}. ${esc(e.name)}${e.nickname && e.nickname !== e.name ? ` <span class="card-sub">(${esc(e.nickname)})</span>` : ''}</div>
-            <div class="pay-item-net">${fmtBaht(e.net_pay)} ฿</div>
-          </div>
-          <div class="pay-item-meta">
-            <span>ฐาน ${fmtBaht(e.base_salary)}</span>
-            ${e.ot_baht ? `<span>• OT ${fmtBaht(e.ot_baht)}</span>` : ''}
-            ${extra ? `<span>• พิเศษ ${fmtBaht(extra)}</span>` : ''}
-            ${e.diligence ? `<span>• ขยัน ${fmtBaht(e.diligence)}</span>` : ''}
-            ${totalDed ? `<span style="color:var(--red);">• หัก -${fmtBaht(totalDed)}</span>` : ''}
+          <div class="pay-item-name">${idx + 1}. ${esc(e.name)}${e.nickname && e.nickname !== e.name ? ` <span class="card-sub">(${esc(e.nickname)})</span>` : ''}</div>
+          <div class="pay-item-net">${fmtBaht(e.net_pay)} ฿</div>
+          <div class="pay-item-breakdown">
+            <div class="pay-item-b-row"><span>ฐานเงินเดือน</span><span>${fmtBaht(e.base_salary)}</span></div>
+            <div class="pay-item-b-row"><span>Earning (+)</span><span class="b-plus">+${fmtBaht(extraEarn)}</span></div>
+            <div class="pay-item-b-row"><span>Deduction (-)</span><span class="b-minus">-${fmtBaht(totalDed)}</span></div>
           </div>
         </div>`;
       }).join('');
@@ -1476,9 +1478,13 @@
 
         <div class="pay-live-bar">
           <div class="pay-live-nums">
-            <div><span class="lbl">รวมรายได้</span><span id="liveEarnBar" class="val">0.00</span></div>
-            <div><span class="lbl">รวมรายการหัก</span><span id="liveDedBar" class="val" style="color:#fca5a5;">-0.00</span></div>
-            <div><span class="lbl">ยอดจ่ายสุทธิ (ประมาณการสด)</span><span id="liveNetBar" class="net">0.00 ฿</span></div>
+            <div><span class="lbl">ฐานเงินเดือน</span><span id="liveBaseBar" class="val">0.00</span></div>
+            <span class="pay-live-op">+</span>
+            <div><span class="lbl">Earning (รายได้เพิ่ม)</span><span id="liveEarnBar" class="val val-plus">+0.00</span></div>
+            <span class="pay-live-op">−</span>
+            <div><span class="lbl">Deduction (รายการหัก)</span><span id="liveDedBar" class="val val-minus">-0.00</span></div>
+            <span class="pay-live-op">=</span>
+            <div><span class="lbl">ยอดจ่ายสุทธิ</span><span id="liveNetBar" class="net">0.00 ฿</span></div>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-primary" onclick="savePayrollInline(false)">💾 บันทึก</button>
@@ -1516,7 +1522,8 @@
       const uForbid = Math.abs(Number($('piForbid').value) || 0);
       const uTax = Math.abs(Number($('piTax').value) || 0);
 
-      const totalEarn = sal + otAuto + comm + meas + frame + dil + pos + phone;
+      const extraEarn = otAuto + comm + meas + frame + dil + pos + phone;
+      const totalEarn = sal + extraEarn;
       const totalDedBeforeSso = absAuto + lateAuto + pvdAuto + uUniform + uGoods + uDmg + uOther + uForbid;
       const netBeforeSso = Math.round(totalEarn - totalDedBeforeSso);
       const totalDedAll = totalDedBeforeSso + ssoAuto + uTax;
@@ -1527,9 +1534,10 @@
       if ($('piLateAuto')) $('piLateAuto').textContent = fmtBaht(lateAuto);
       if ($('piPvdAuto')) $('piPvdAuto').textContent = fmtBaht(pvdAuto);
       if ($('piSsoAuto')) $('piSsoAuto').textContent = fmtBaht(ssoAuto);
-      if ($('liveEarnTotal')) $('liveEarnTotal').textContent = fmtBaht(totalEarn) + ' ฿';
+      if ($('liveEarnTotal')) $('liveEarnTotal').textContent = '+' + fmtBaht(totalEarn) + ' ฿';
       if ($('liveDedTotal')) $('liveDedTotal').textContent = '-' + fmtBaht(totalDedAll) + ' ฿';
-      if ($('liveEarnBar')) $('liveEarnBar').textContent = fmtBaht(totalEarn);
+      if ($('liveBaseBar')) $('liveBaseBar').textContent = fmtBaht(sal);
+      if ($('liveEarnBar')) $('liveEarnBar').textContent = '+' + fmtBaht(extraEarn);
       if ($('liveDedBar')) $('liveDedBar').textContent = '-' + fmtBaht(totalDedAll);
       if ($('liveNetBar')) $('liveNetBar').textContent = fmtBaht(netPay) + ' ฿';
     }
